@@ -1,4 +1,4 @@
-﻿import type { CollectionRun, NewsArticle } from "@news-for-me/shared";
+import type { CollectionRun, NewsArticle } from "@news-for-me/shared";
 import type {
   CollectedNewsItem,
   CollectionJobMessage,
@@ -212,7 +212,13 @@ export async function markCollectionDeadLettered(
   await db.prepare(`
     UPDATE collection_runs
     SET status = 'failed',
-      error_message = COALESCE(error_message, 'Queue retry limit reached.'),
+      error_message = CASE
+        WHEN error_message IS NULL OR error_message = ''
+          THEN 'Queue retry limit reached.'
+        WHEN substr(error_message, 1, 15) = 'Retry pending: '
+          THEN 'Queue retry limit reached. Last error: ' || substr(error_message, 16, 800)
+        ELSE 'Queue retry limit reached. Last error: ' || substr(error_message, 1, 800)
+      END,
       finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
     WHERE id = ?
   `).bind(runId).run();
