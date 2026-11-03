@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@news-for-me/shared": "*",
-    "fast-xml-parser": "^5.11.2"
+    "fast-xml-parser": "^5.11.2",
+    "better-auth": "^1.7.15"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261102.1",
