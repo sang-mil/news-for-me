@@ -114,7 +114,8 @@ export async function listTopicArticles(
 export async function storeCollectedArticles(
   db: D1Database,
   job: CollectionJobMessage,
-  items: CollectedNewsItem[]
+  items: CollectedNewsItem[],
+  collectionNote: string | null = null
 ): Promise<StoredCollectedArticle[]> {
   const statements: D1PreparedStatement[] = [];
   const stored: StoredCollectedArticle[] = [];
@@ -158,16 +159,16 @@ export async function storeCollectedArticles(
 
     statements.push(db.prepare(`
       INSERT OR IGNORE INTO topic_articles (topic_id, article_id, match_reason)
-      VALUES (?, ?, 'Google News RSS keyword search')
+      VALUES (?, ?, 'News RSS keyword search')
     `).bind(job.topicId, articleId));
   }
 
   statements.push(db.prepare(`
     UPDATE collection_runs
-    SET status = 'completed', articles_found = ?, error_message = NULL,
+    SET status = 'completed', articles_found = ?, error_message = ?,
       finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
     WHERE id = ? AND topic_id = ?
-  `).bind(items.length, job.runId, job.topicId));
+  `).bind(items.length, collectionNote?.slice(0, 950) ?? null, job.runId, job.topicId));
 
   statements.push(db.prepare(`
     UPDATE topics
