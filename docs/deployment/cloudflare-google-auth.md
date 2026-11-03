@@ -155,11 +155,14 @@ YouTube와 X는 선택형 소스입니다. Worker Secret에 등록되어야 Queu
 ~~~powershell
 npx wrangler secret put YOUTUBE_API_KEY
 npx wrangler secret put X_BEARER_TOKEN
+npx wrangler secret put THREADS_ACCESS_TOKEN
 ~~~
 
 두 값은 로컬 `.dev.vars` 또는 Cloudflare Worker Secret으로만 관리하고 프론트엔드 변수나 저장소에 넣지 마세요. YouTube Data API `search.list`의 기본 할당량은 100회/일입니다. X는 현재 게시물 읽기 리소스당 과금되며 공개 단가는 게시물 1건당 USD 0.005입니다. X 최근 검색 API는 요청당 최소 10개 결과를 요구하므로, X 개발자 콘솔에서 사용 한도와 지출 한도를 설정하세요.
 
 GitHub 저장소와 V2EX는 개발/기술 관련 주제에서만 검색합니다. 뉴스, YouTube, X 결과는 주제명 또는 포함 키워드와 실제 텍스트가 일치하는 경우에만 저장됩니다.
+
+Threads는 Meta Threads API `keyword_search`를 사용합니다. Meta 앱에서 Threads API 사용 사례를 설정하고 OAuth 사용자 토큰에 `threads_basic` 및 승인된 `threads_keyword_search` 권한을 요청하세요. 공개 게시물 키워드 검색은 Meta 앱 검토 승인이 필요할 수 있으며, 승인 전에는 공개 검색 결과가 제한될 수 있습니다. 토큰은 프론트엔드에 전달하지 말고 Worker Secret `THREADS_ACCESS_TOKEN`으로만 저장하세요. 사용자 액세스 토큰의 만료 시점을 관리하고 만료 전에 갱신해야 합니다.
 
 ## 5. Worker 배포
 
