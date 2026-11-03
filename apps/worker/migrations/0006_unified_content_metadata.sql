@@ -11,4 +11,4 @@ UPDATE articles SET provider = COALESCE(json_extract(metadata_json, '$.provider'
 
 CREATE INDEX idx_articles_provider_published ON articles(provider, published_at DESC);
 CREATE INDEX idx_articles_content_type_published ON articles(content_type, published_at DESC);
-CREATE UNIQUE INDEX idx_articles_provider_external_id ON articles(provider, external_id) WHERE external_id IS NOT NULL;
+CREATE INDEX idx_articles_provider_external_id ON articles(provider, external_id) WHERE external_id IS NOT NULL;
