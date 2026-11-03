@@ -8,6 +8,7 @@ import {
 import { googleNewsRssSource } from "../../services/news/sources/google-news-rss";
 import { searchBingNewsRss } from "../../services/news/sources/bing-news-rss";
 import { searchGitHubRepositories } from "../../services/news/sources/github-search";
+import { searchV2exTopics } from "../../services/news/sources/v2ex";
 import { summarizeCollectedArticles } from "../../services/ai/summarizer";
 import type { AIEnvironment } from "../../services/ai/types";
 import type { CollectionJobMessage } from "../../services/news/types";
@@ -47,7 +48,8 @@ async function processCollectionJob(
   const sources = [
     { id: "google-news-rss", search: () => googleNewsRssSource.search(searchInput) },
     { id: "bing-news-rss", search: async () => (await searchBingNewsRss(searchInput, maxArticles)).items },
-    { id: "github-search", search: () => searchGitHubRepositories(searchInput, maxArticles) }
+    { id: "github-search", search: () => searchGitHubRepositories(searchInput, maxArticles) },
+    { id: "v2ex-public-api", search: () => searchV2exTopics(searchInput, maxArticles) }
   ];
   const settled = await Promise.allSettled(sources.map((source) => source.search()));
   const failures: string[] = [];
