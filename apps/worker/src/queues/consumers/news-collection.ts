@@ -7,11 +7,12 @@ import { googleNewsRssSource } from "../../services/news/sources/google-news-rss
 import { searchBingNewsRss } from "../../services/news/sources/bing-news-rss";
 import { searchGitHubRepositories } from "../../services/news/sources/github-search";
 import { searchV2exTopics } from "../../services/news/sources/v2ex";
+import { createYouTubeVideosSource } from "../../services/news/sources/youtube";
 import { summarizeCollectedArticles } from "../../services/ai/summarizer";
 import type { AIEnvironment } from "../../services/ai/types";
 import type { CollectionJobMessage, NewsSource } from "../../services/news/types";
 
-interface CollectionConsumerEnv extends AIEnvironment { DB: D1Database; }
+interface CollectionConsumerEnv extends AIEnvironment { DB: D1Database; YOUTUBE_API_KEY?: string; }
 
 function parseKeywords(value: string): string[] {
   try {
@@ -33,6 +34,11 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
     { id: "github-search", contentType: "repository", search: (input) => searchGitHubRepositories(input) },
     { id: "v2ex-public-api", contentType: "discussion", search: (input) => searchV2exTopics(input) }
   ];
+  if (env.YOUTUBE_API_KEY?.trim()) {
+    sources.push(createYouTubeVideosSource(env.YOUTUBE_API_KEY.trim()));
+  } else {
+    console.info("[NewsForMe][YouTube] source skipped because YOUTUBE_API_KEY is not configured");
+  }
   const collection = await collectFromSources(sources, searchInput, maxArticles);
   const sourceSummary = Object.entries(collection.sourceCounts).map(([id, count]) => id + "=" + count).join(", ");
   const failureSummary = collection.failures.map((failure) => failure.sourceId + ": " + failure.message).join(" | ");
