@@ -65,6 +65,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [collectingTopicId, setCollectingTopicId] = useState<string | null>(null);
+  const [collectionLimit, setCollectionLimit] = useState(10);
   const [collectionRuns, setCollectionRuns] = useState<Record<string, CollectionRun>>({});
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -294,14 +295,15 @@ export default function App() {
     let lastLoggedState = "";
 
     try {
-      runId = await collectTopic(topic.id);
+      runId = await collectTopic(topic.id, collectionLimit);
       console.info("[NewsForMe][Collection] queued", {
         runId,
         topicId: topic.id,
         topicName: topic.name,
+        maxArticles: collectionLimit,
         queuedAt: new Date().toISOString()
       });
-      setNotice(`'${topic.name}' 뉴스 수집 작업을 대기열에 등록했어요.`);
+      setNotice(`'${topic.name}' 뉴스 수집 작업을 ${collectionLimit}개 한도로 대기열에 등록했어요.`);
 
       // Queue retries can take longer than the previous 30-second UI polling window.
       // Keep observing for up to five minutes and log each meaningful state change.
@@ -673,6 +675,12 @@ export default function App() {
                       )}
                     </div>
                     <div className="topic-actions topic-actions-column">
+                      <label className="collection-limit-control">
+                        수집 개수
+                        <select value={collectionLimit} onChange={(event) => setCollectionLimit(Number(event.target.value))} aria-label="수집할 뉴스 개수" disabled={collectingTopicId !== null}>
+                          {[5, 10, 15, 20, 30].map((count) => <option key={count} value={count}>{count}개</option>)}
+                        </select>
+                      </label>
                       <button type="button" className="icon-button collect-button" onClick={() => void handleCollect(topic)} disabled={collectingTopicId !== null || status !== "online"}>{collectingTopicId === topic.id ? "수집 중…" : "뉴스 수집"}</button>
                       <button type="button" className="icon-button" onClick={() => void loadArticles(topic.id)}>기사 보기</button>
                       <button type="button" className="icon-button" onClick={() => startEdit(topic)}>수정</button>
