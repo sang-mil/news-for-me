@@ -79,7 +79,10 @@ export function createThreadsPostsSource(accessToken: string): NewsSource {
       for (const post of payload.data ?? []) {
         const id = post.id?.trim();
         const text = post.text?.trim() ?? "";
-        if (!id || !text || !post.permalink?.startsWith("https://www.threads.net/")) continue;
+        if (!id || !text || !post.permalink) continue;
+        let permalink: URL;
+        try { permalink = new URL(post.permalink); } catch { continue; }
+        if (permalink.protocol !== "https:" || !["threads.com", "www.threads.com", "threads.net", "www.threads.net"].includes(permalink.hostname)) continue;
 
         const username = post.username?.trim() ?? "";
         const searchable = [text, username, post.topic_tag ?? ""].join(" ").toLocaleLowerCase();
@@ -89,7 +92,7 @@ export function createThreadsPostsSource(accessToken: string): NewsSource {
         const timestamp = post.timestamp ? Date.parse(post.timestamp) : Number.NaN;
         results.push({
           title: text.replace(/\s+/g, " ").slice(0, 500),
-          url: post.permalink,
+          url: permalink.toString(),
           sourceName: "Threads",
           publishedAt: Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null,
           excerpt: text.slice(0, 2000),
