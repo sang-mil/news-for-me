@@ -1,4 +1,4 @@
-﻿import { XMLParser } from "fast-xml-parser";
+import { XMLParser } from "fast-xml-parser";
 import type { CollectedNewsItem, NewsSearchInput, NewsSource } from "../types";
 
 const parser = new XMLParser({
@@ -73,15 +73,32 @@ export async function searchGoogleNewsRss(
   url.searchParams.set("gl", "KR");
   url.searchParams.set("ceid", "KR:ko");
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      Accept: "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
-      "User-Agent": "NewsForMe/0.1 RSS reader"
-    }
-  });
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      headers: {
+        Accept: "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+        "User-Agent": "NewsForMe/0.1 RSS reader"
+      },
+      signal: AbortSignal.timeout(12_000)
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unknown fetch error";
+    throw new Error(`Google News RSS request failed before receiving a response: ${detail.slice(0, 300)}`);
+  }
 
   if (!response.ok) {
-    throw new Error(`Google News RSS returned HTTP ${response.status}.`);
+    const contentType = response.headers.get("content-type") ?? "unknown";
+    const retryAfter = response.headers.get("retry-after") ?? "not provided";
+    let bodyPreview = "";
+    try {
+      bodyPreview = (await response.text()).replace(/\\s+/g, " ").trim().slice(0, 300);
+    } catch {
+      bodyPreview = "response body could not be read";
+    }
+    throw new Error(
+      `Google News RSS returned HTTP ${response.status}; content-type=${contentType}; retry-after=${retryAfter}; body=${bodyPreview || "empty"}`
+    );
   }
 
   const xml = await response.text();

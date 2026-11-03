@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type {
   ApiHealthResponse, CollectionRun, NewsArticle, SavedNewsArticle,
   SavedNewsTag, Topic, TopicInput
@@ -289,26 +289,92 @@ export default function App() {
   }
   async function handleCollect(topic: Topic) {
     setCollectingTopicId(topic.id); setError(""); setNotice("");
+    let runId: string | null = null;
+    let lastRun: CollectionRun | null = null;
+    let lastLoggedState = "";
+
     try {
-      const runId = await collectTopic(topic.id);
+      runId = await collectTopic(topic.id);
+      console.info("[NewsForMe][Collection] queued", {
+        runId,
+        topicId: topic.id,
+        topicName: topic.name,
+        queuedAt: new Date().toISOString()
+      });
       setNotice(`'${topic.name}' 뉴스 수집 작업을 대기열에 등록했어요.`);
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        await wait(1500);
+
+      // Queue retries can take longer than the previous 30-second UI polling window.
+      // Keep observing for up to five minutes and log each meaningful state change.
+      for (let attempt = 1; attempt <= 150; attempt += 1) {
+        await wait(2000);
         const run = await getCollectionRun(topic.id, runId);
+        lastRun = run;
         setCollectionRuns((current) => ({ ...current, [topic.id]: run }));
+
+        const signature = [run.status, run.errorMessage ?? "", run.articlesFound].join("|");
+        if (signature !== lastLoggedState) {
+          lastLoggedState = signature;
+          const diagnostic = {
+            runId,
+            topicId: topic.id,
+            topicName: topic.name,
+            status: run.status,
+            articlesFound: run.articlesFound,
+            errorMessage: run.errorMessage,
+            startedAt: run.startedAt,
+            finishedAt: run.finishedAt,
+            pollAttempt: attempt,
+            observedAt: new Date().toISOString()
+          };
+          if (run.status === "failed") {
+            console.error("[NewsForMe][Collection] failed", diagnostic);
+          } else if (run.errorMessage) {
+            console.warn("[NewsForMe][Collection] retry/status detail", diagnostic);
+          } else {
+            console.info("[NewsForMe][Collection] status changed", diagnostic);
+          }
+        }
+
         if (run.status === "completed") {
           const articles = await listTopicArticles(topic.id);
           setArticlesByTopic((current) => ({ ...current, [topic.id]: articles }));
           setExpandedTopicId(topic.id);
           setTopics(await listTopics());
+          if (run.articlesFound === 0) {
+            console.warn("[NewsForMe][Collection] completed with zero articles", {
+              runId, topicId: topic.id, topicName: topic.name
+            });
+          }
           setNotice(`'${topic.name}' 수집 완료: ${run.articlesFound}개 기사를 확인했어요.`);
           return;
         }
-        if (run.status === "failed") throw new Error(run.errorMessage ?? "뉴스 수집에 실패했습니다.");
+
+        if (run.status === "failed") {
+          throw new Error(run.errorMessage ?? "뉴스 수집에 실패했습니다.");
+        }
       }
-      setNotice(`'${topic.name}' 수집 작업이 아직 진행 중이에요. 잠시 후 다시 확인해 주세요.`);
+
+      console.warn("[NewsForMe][Collection] polling timed out", {
+        runId,
+        topicId: topic.id,
+        topicName: topic.name,
+        lastStatus: lastRun?.status ?? "unknown",
+        lastError: lastRun?.errorMessage ?? null,
+        lastObservedAt: new Date().toISOString()
+      });
+      setNotice(`'${topic.name}' 수집 결과 확인 시간이 초과됐어요. 개발자 콘솔에서 [NewsForMe][Collection] 로그를 확인해 주세요.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "뉴스 수집 요청에 실패했습니다.");
+      const message = err instanceof Error ? err.message : "뉴스 수집 요청에 실패했습니다.";
+      console.error("[NewsForMe][Collection] request/poll error", {
+        runId,
+        topicId: topic.id,
+        topicName: topic.name,
+        error: message,
+        lastStatus: lastRun?.status ?? null,
+        lastError: lastRun?.errorMessage ?? null,
+        observedAt: new Date().toISOString()
+      });
+      setError(message);
     } finally {
       setCollectingTopicId(null);
     }
@@ -575,7 +641,16 @@ export default function App() {
                         {topic.excludeKeywords.length > 0 && <div className="keyword-row"><span className="keyword-label excluded">제외</span>{topic.excludeKeywords.map((keyword) => <span className="keyword-chip keyword-chip-muted" key={`out-${keyword}`}>{keyword}</span>)}</div>}
                         {topic.includeKeywords.length === 0 && topic.excludeKeywords.length === 0 && <span className="keyword-hint">키워드 조건 없음</span>}
                       </div>
-                      {run && <div className="collection-status">최근 수집 작업: {run.status} · {run.articlesFound}건</div>}
+                      {run && (
+                        <div className="collection-status" aria-live="polite">
+                          <div>최근 수집 작업: {run.status} · {run.articlesFound}건</div>
+                          {run.errorMessage && (
+                            <div className="collection-error" role="status">
+                              수집 진단: {run.errorMessage}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {expandedTopicId === topic.id && (
                         <div className="article-list">
                           <div className="article-list-heading">최근 수집 기사</div>

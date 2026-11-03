@@ -1,4 +1,4 @@
-﻿import {
+import {
   getTopicForCollection,
   markCollectionDeadLettered,
   markCollectionRetrying,
@@ -76,17 +76,36 @@ export async function handleNewsCollectionQueue(
       continue;
     }
 
+    console.info("[NewsForMe][Collection] job started", {
+      runId: message.body.runId,
+      topicId: message.body.topicId,
+      queue: batch.queue
+    });
+
     try {
       await processCollectionJob(message.body, env);
+      console.info("[NewsForMe][Collection] job completed", {
+        runId: message.body.runId,
+        topicId: message.body.topicId
+      });
       message.ack();
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Unknown collection error";
       try {
         await markCollectionRetrying(env.DB, message.body.runId, detail);
       } catch (dbError) {
-        console.error("Could not record collection retry state", dbError);
+        console.error("[NewsForMe][Collection] could not persist retry state", {
+          runId: message.body.runId,
+          error: dbError instanceof Error ? dbError.message : String(dbError)
+        });
       }
-      console.error("News collection failed; queue will retry", message.body.runId, detail);
+      console.error("[NewsForMe][Collection] job failed; retry scheduled", {
+        runId: message.body.runId,
+        topicId: message.body.topicId,
+        retryDelaySeconds: 30,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        error: detail
+      });
       message.retry({ delaySeconds: 30 });
     }
   }

@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   ApiHealthResponse,
   CollectionRun,
   CollectionStartResponse,
@@ -28,6 +28,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     const errorPayload = payload as ErrorPayload | null;
     const detail = errorPayload?.details?.join(" ");
+    console.error("[NewsForMe][API] request failed", {
+      path,
+      method: init?.method ?? "GET",
+      status: response.status,
+      statusText: response.statusText,
+      error: errorPayload?.error ?? null,
+      details: errorPayload?.details ?? null,
+      observedAt: new Date().toISOString()
+    });
     throw new Error([errorPayload?.error ?? `Request failed (${response.status})`, detail].filter(Boolean).join(" "));
   }
   return payload as T;
