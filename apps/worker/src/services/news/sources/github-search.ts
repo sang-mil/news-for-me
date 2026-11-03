@@ -81,7 +81,11 @@ export async function searchGitHubRepositories(
       sourceName: "GitHub",
       publishedAt: Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null,
       excerpt: [description, details].filter(Boolean).join(" · ").slice(0, 2000) || null,
-      provider: "github-search"
+      provider: "github-search",
+      contentType: "repository",
+      externalId: fullName,
+      language: repository.language ?? null,
+      engagement: { stars, updatedAt: repository.updated_at ?? null }
     });
     if (results.length >= maxResults) break;
   }
