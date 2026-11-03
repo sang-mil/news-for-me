@@ -51,7 +51,8 @@ PowerShell에서 Worker 디렉터리로 이동해 내보냅니다.
 
 ~~~powershell
 Set-Location C:\dev\news-for-me\apps\worker
-npx wrangler d1 export news-for-me-db --local --no-schema --output .\local-news-data.sql
+New-Item -ItemType Directory -Force ..\..\.local-backups | Out-Null
+npx wrangler d1 export news-for-me-db --local --no-schema --output ..\..\.local-backups\news-for-me-local-data.sql
 ~~~
 
 내보낸 SQL을 열어 users와 앱 데이터의 INSERT 문만 포함되어 있는지 확인하세요. 이 파일은 비밀값은 아니지만 개인 뉴스/메모가 포함될 수 있으므로 Git에 올리지 마세요.
@@ -99,7 +100,7 @@ npx wrangler d1 migrations apply news-for-me-db --remote
 이 SQL을 운영 DB에 적용합니다.
 
 ~~~powershell
-npx wrangler d1 execute news-for-me-db --remote --file .\local-news-data.sql
+npx wrangler d1 execute news-for-me-db --remote --file ..\..\.local-backups\news-for-me-local-data.sql
 ~~~
 
 내보내기 SQL이 users와 앱 데이터 INSERT만 포함하는지 먼저 열어 확인하세요. 운영 DB의 테이블 생성은 앞 단계의 migration으로 수행한 상태여야 합니다. SQL을 확인하지 않고 운영 DB에 실행하지 마세요.
