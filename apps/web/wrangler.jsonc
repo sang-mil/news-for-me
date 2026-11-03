@@ -1,0 +1,7 @@
+﻿{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "news-for-me",
+  "compatibility_date": "2026-11-02",
+  "pages_build_output_dir": "./dist"
+}
+

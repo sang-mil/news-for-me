@@ -1,0 +1,219 @@
+﻿import type { CollectionRun, NewsArticle } from "@news-for-me/shared";
+import type {
+  CollectedNewsItem,
+  CollectionJobMessage,
+  StoredCollectedArticle,
+  TopicForCollection
+} from "../../services/news/types";
+
+interface CollectionRunRow {
+  id: string;
+  topic_id: string;
+  status: CollectionRun["status"];
+  articles_found: number;
+  error_message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+}
+
+interface ArticleRow {
+  id: string;
+  title: string;
+  canonical_url: string;
+  source_name: string | null;
+  published_at: string | null;
+  fetched_at: string;
+  content_excerpt: string | null;
+}
+
+function toCollectionRun(row: CollectionRunRow): CollectionRun {
+  return {
+    id: row.id,
+    topicId: row.topic_id,
+    status: row.status,
+    articlesFound: row.articles_found,
+    errorMessage: row.error_message,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    createdAt: row.created_at
+  };
+}
+
+export async function getTopicForCollection(
+  db: D1Database,
+  userId: string,
+  topicId: string
+): Promise<TopicForCollection | null> {
+  return db.prepare(`
+    SELECT id, user_id, name, description,
+      include_keywords_json, exclude_keywords_json
+    FROM topics
+    WHERE id = ? AND user_id = ? AND is_active = 1
+    LIMIT 1
+  `).bind(topicId, userId).first<TopicForCollection>();
+}
+
+export async function createCollectionRun(
+  db: D1Database,
+  topicId: string
+): Promise<string> {
+  const runId = crypto.randomUUID();
+  await db.prepare(`
+    INSERT INTO collection_runs (id, topic_id, trigger_source, status)
+    VALUES (?, ?, 'manual', 'queued')
+  `).bind(runId, topicId).run();
+  return runId;
+}
+
+export async function getCollectionRun(
+  db: D1Database,
+  userId: string,
+  topicId: string,
+  runId: string
+): Promise<CollectionRun | null> {
+  const row = await db.prepare(`
+    SELECT cr.id, cr.topic_id, cr.status, cr.articles_found,
+      cr.error_message, cr.started_at, cr.finished_at, cr.created_at
+    FROM collection_runs cr
+    INNER JOIN topics t ON t.id = cr.topic_id
+    WHERE cr.id = ? AND cr.topic_id = ? AND t.user_id = ?
+    LIMIT 1
+  `).bind(runId, topicId, userId).first<CollectionRunRow>();
+  return row ? toCollectionRun(row) : null;
+}
+
+export async function listTopicArticles(
+  db: D1Database,
+  userId: string,
+  topicId: string,
+  limit = 20
+): Promise<NewsArticle[]> {
+  const result = await db.prepare(`
+    SELECT a.id, a.title, a.canonical_url, a.source_name,
+      a.published_at, a.fetched_at, a.content_excerpt
+    FROM articles a
+    INNER JOIN topic_articles ta ON ta.article_id = a.id
+    INNER JOIN topics t ON t.id = ta.topic_id
+    WHERE ta.topic_id = ? AND t.user_id = ?
+    ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
+    LIMIT ?
+  `).bind(topicId, userId, limit).all<ArticleRow>();
+
+  return result.results.map((row) => ({
+    id: row.id,
+    title: row.title,
+    canonicalUrl: row.canonical_url,
+    sourceName: row.source_name,
+    publishedAt: row.published_at,
+    fetchedAt: row.fetched_at,
+    contentExcerpt: row.content_excerpt
+  }));
+}
+
+export async function storeCollectedArticles(
+  db: D1Database,
+  job: CollectionJobMessage,
+  items: CollectedNewsItem[]
+): Promise<StoredCollectedArticle[]> {
+  const statements: D1PreparedStatement[] = [];
+  const stored: StoredCollectedArticle[] = [];
+  const seen = new Set<string>();
+
+  for (const item of items) {
+    const canonicalUrl = new URL(item.url);
+    canonicalUrl.hash = "";
+    for (const key of [...canonicalUrl.searchParams.keys()]) {
+      const lower = key.toLowerCase();
+      if (lower.startsWith("utm_") ||
+          ["gclid", "fbclid", "mc_cid", "mc_eid"].includes(lower)) {
+        canonicalUrl.searchParams.delete(key);
+      }
+    }
+
+    const normalizedUrl = canonicalUrl.toString();
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(normalizedUrl)
+    );
+    const urlHash = Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+    const articleId = `article_${urlHash.slice(0, 40)}`;
+
+    if (!seen.has(articleId)) {
+      stored.push({ articleId, item });
+      seen.add(articleId);
+    }
+
+    statements.push(db.prepare(`
+      INSERT OR IGNORE INTO articles (
+        id, canonical_url, url_hash, title, source_name,
+        published_at, content_excerpt, language, metadata_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'ko', ?)
+    `).bind(
+      articleId, normalizedUrl, urlHash, item.title, item.sourceName,
+      item.publishedAt, item.excerpt, JSON.stringify({ provider: item.provider })
+    ));
+
+    statements.push(db.prepare(`
+      INSERT OR IGNORE INTO topic_articles (topic_id, article_id, match_reason)
+      VALUES (?, ?, 'Google News RSS keyword search')
+    `).bind(job.topicId, articleId));
+  }
+
+  statements.push(db.prepare(`
+    UPDATE collection_runs
+    SET status = 'completed', articles_found = ?, error_message = NULL,
+      finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = ? AND topic_id = ?
+  `).bind(items.length, job.runId, job.topicId));
+
+  statements.push(db.prepare(`
+    UPDATE topics
+    SET last_collected_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+      updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = ? AND user_id = ?
+  `).bind(job.topicId, job.userId));
+
+  await db.batch(statements);
+  return stored;
+}
+
+export async function markCollectionStarted(
+  db: D1Database,
+  runId: string
+): Promise<void> {
+  await db.prepare(`
+    UPDATE collection_runs
+    SET status = 'running',
+      started_at = COALESCE(started_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      error_message = NULL
+    WHERE id = ?
+  `).bind(runId).run();
+}
+
+export async function markCollectionRetrying(
+  db: D1Database,
+  runId: string,
+  errorMessage: string
+): Promise<void> {
+  await db.prepare(`
+    UPDATE collection_runs
+    SET status = 'queued', error_message = ?, finished_at = NULL
+    WHERE id = ?
+  `).bind(`Retry pending: ${errorMessage}`.slice(0, 1000), runId).run();
+}
+
+export async function markCollectionDeadLettered(
+  db: D1Database,
+  runId: string
+): Promise<void> {
+  await db.prepare(`
+    UPDATE collection_runs
+    SET status = 'failed',
+      error_message = COALESCE(error_message, 'Queue retry limit reached.'),
+      finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = ?
+  `).bind(runId).run();
+}

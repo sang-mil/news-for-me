@@ -1,0 +1,24 @@
+{
+  "name": "news-for-me",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n WEB,API -c cyan,green \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "npm run dev --workspace @news-for-me/web",
+    "dev:api": "npm run dev --workspace @news-for-me/worker",
+    "build": "npm run build --workspace @news-for-me/web",
+    "typecheck:web": "npm run typecheck --workspace @news-for-me/web",
+    "typecheck:api": "npm run typecheck --workspace @news-for-me/worker"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "wrangler": "^4.156.1"
+  }
+}

@@ -1,0 +1,19 @@
+﻿node_modules/
+dist/
+build/
+coverage/
+
+.wrangler/
+.dev.vars
+.env
+.env.*
+!.env.example
+
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local implementation backups
+.local-backups/

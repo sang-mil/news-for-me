@@ -1,0 +1,17 @@
+﻿# Add the real values to apps/worker/.dev.vars, not to this example file.
+GEMINI_API_KEY_1=your-gemini-api-key-1
+GEMINI_API_KEY_2=your-gemini-api-key-2
+
+# Same label if both keys are from the same Google Cloud project.
+# Different labels only if they are genuinely separate projects.
+GEMINI_PROJECT_SLOT_1=google-project-a
+GEMINI_PROJECT_SLOT_2=google-project-b
+
+GEMINI_MODEL_PRIMARY=gemini-3.8-flash
+GEMINI_MODEL_FALLBACK=gemini-3.5-flash-lite
+
+OPENROUTER_API_KEY=your-openrouter-api-key
+OPENROUTER_MODEL=openrouter/free
+OPENROUTER_ALLOW_PAID=false
+OPENROUTER_SITE_URL=http://localhost:5173
+OPENROUTER_APP_TITLE=News for Me

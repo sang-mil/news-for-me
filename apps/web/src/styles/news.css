@@ -1,0 +1,70 @@
+﻿.collection-status {
+  margin-top: 11px;
+  color: #68758b;
+  font-size: 10px;
+}
+.topic-actions-column {
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 76px;
+}
+.topic-actions-column .icon-button {
+  padding: 7px 8px;
+  border: 1px solid #e8ebf2;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+.topic-actions-column .collect-button {
+  color: #fff;
+  background: #365ee9;
+  border-color: #365ee9;
+}
+.topic-actions-column .collect-button:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+.article-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid #edf0f4;
+}
+.article-list-heading {
+  color: #3b4962;
+  font-size: 11px;
+  font-weight: 800;
+}
+.article-empty {
+  margin: 0;
+  color: #929baa;
+  font-size: 11px;
+}
+.article-item {
+  display: grid;
+  gap: 5px;
+}
+.article-item a {
+  color: #273b67;
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 700;
+  text-decoration: none;
+}
+.article-item a:hover {
+  color: #365ee9;
+  text-decoration: underline;
+}
+.article-meta {
+  color: #939cab;
+  font-size: 10px;
+}
+.article-item p {
+  margin: 0;
+  color: #778295;
+  font-size: 11px;
+  line-height: 1.6;
+}
+@media (max-width: 560px) {
+  .topic-actions-column { flex-direction: column; }
+}
