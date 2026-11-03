@@ -67,7 +67,9 @@ export async function searchGitHubRepositories(
     if (excluded.some((keyword) => searchable.includes(keyword))) continue;
 
     const timestamp = repository.updated_at ? Date.parse(repository.updated_at) : Number.NaN;
-    const stars = Number.isFinite(repository.stargazers_count) ? repository.stargazers_count : 0;
+    const stars = typeof repository.stargazers_count === "number" && Number.isFinite(repository.stargazers_count)
+      ? repository.stargazers_count
+      : 0;
     const details = [
       repository.language ? `언어: ${repository.language}` : null,
       `Stars: ${stars.toLocaleString("en-US")}`
