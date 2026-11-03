@@ -58,6 +58,7 @@ export default function App() {
   const [tagDrafts, setTagDrafts] = useState<Record<string, string[]>>({});
   const [archiveQuery, setArchiveQuery] = useState("");
   const [archiveTagFilter, setArchiveTagFilter] = useState("all");
+  const [isArchiveExpanded, setIsArchiveExpanded] = useState(true);
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState("#64748b");
   const [busyArchiveId, setBusyArchiveId] = useState<string | null>(null);
@@ -509,6 +510,15 @@ export default function App() {
       <section className="scraps-section" id="archive" aria-labelledby="archive-title">
         <div className="section-heading archive-heading">
           <div><div className="section-kicker">PERSONAL ARCHIVE</div><h2 id="archive-title">스크랩 보관함 <span className="count-badge">{scraps.length}개</span></h2></div>
+          <button
+            type="button"
+            className="archive-toggle-button"
+            aria-expanded={isArchiveExpanded}
+            aria-controls="archive-content"
+            onClick={() => setIsArchiveExpanded((current) => !current)}
+          >
+            {isArchiveExpanded ? "접기 −" : "펼치기 ＋"}
+          </button>
           <form className="archive-create-tag" onSubmit={(event) => void handleCreateTag(event)}>
             <input aria-label="새 태그 이름" value={newTagName} onChange={(event) => setNewTagName(event.target.value)} maxLength={30} placeholder="새 태그 이름" required />
             <input aria-label="태그 색상" type="color" value={newTagColor} onChange={(event) => setNewTagColor(event.target.value)} />
@@ -516,6 +526,7 @@ export default function App() {
           </form>
         </div>
 
+        <div id="archive-content" hidden={!isArchiveExpanded}>
         <div className="archive-tools">
           <input className="archive-search" value={archiveQuery} onChange={(event) => setArchiveQuery(event.target.value)} placeholder="제목, 출처, 메모, 태그 검색" aria-label="스크랩 뉴스 검색" />
           <select value={archiveTagFilter} onChange={(event) => setArchiveTagFilter(event.target.value)} aria-label="태그 필터">
@@ -615,6 +626,7 @@ export default function App() {
             })}
           </div>
         )}
+        </div>
       </section>
 
       <section className="workspace-grid">

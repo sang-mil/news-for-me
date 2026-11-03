@@ -1,4 +1,4 @@
-﻿@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css");
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css");
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Newsreader:wght@500;600&display=swap");
 
 :root {
@@ -1091,3 +1091,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 }
 
 .auth-loading { margin: 24px 0 0; color: #778073; font-size: 12px; text-align: center; }
+
+
+/* Collapsible personal archive */
+.archive-toggle-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 9px 14px;
+  border: 1px solid rgba(57, 86, 63, 0.18);
+  border-radius: 999px;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.archive-toggle-button:hover {
+  background: #dfe8dc;
+  transform: translateY(-1px);
+}
+#archive-content[hidden] { display: none; }
