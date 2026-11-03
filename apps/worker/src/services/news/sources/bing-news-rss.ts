@@ -9,6 +9,22 @@ const parser = new XMLParser({
   trimValues: true
 });
 
+interface BingAttemptDiagnostic {
+  queryVariant: "topic-and-keywords" | "topic-only";
+  rssItemCount: number;
+  acceptedCount: number;
+  missingTitleCount: number;
+  missingLinkCount: number;
+  invalidUrlCount: number;
+  excludedCount: number;
+  channelKeys: string[];
+}
+
+export interface BingNewsSearchResult {
+  items: CollectedNewsItem[];
+  diagnostics: BingAttemptDiagnostic[];
+}
+
 function asText(value: unknown): string {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number") return String(value);
@@ -21,8 +37,8 @@ function asText(value: unknown): string {
 
 function cleanExcerpt(value: string): string | null {
   const cleaned = value
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\\s\\S]*?<\\/script>/gi, " ")
+    .replace(/<style[\\s\\S]*?<\\/style>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&#39;/g, "'")
@@ -30,56 +46,78 @@ function cleanExcerpt(value: string): string | null {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/\s+/g, " ")
+    .replace(/\\s+/g, " ")
     .trim();
   return cleaned ? cleaned.slice(0, 2000) : null;
 }
 
 function safeTerm(value: string): string {
   return value
-    .replace(/["\\]/g, " ")
-    .replace(/[\r\n]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/["\\\\]/g, " ")
+    .replace(/[\\r\\n]+/g, " ")
+    .replace(/\\s+/g, " ")
+    .trim()
+    .slice(0, 100);
 }
 
-export function buildBingNewsQuery(input: NewsSearchInput): string {
-  const terms = [...new Set([input.topicName, ...input.includeKeywords]
+function splitTopicTerms(value: string): string[] {
+  return value
+    .split(/[,，;；|]+/)
     .map(safeTerm)
-    .filter(Boolean))]
-    .slice(0, 8);
+    .filter(Boolean);
+}
 
-  return terms.length > 1
-    ? terms.map((term) => `"${term}"`).join(" OR ")
-    : terms[0] ?? "";
+/**
+ * A topic name may contain comma-separated subjects ("Linux, security").
+ * Search them as alternatives instead of one exact phrase containing a comma.
+ * The second query deliberately drops optional include keywords to widen recall.
+ */
+export function buildBingNewsQueries(input: NewsSearchInput): string[] {
+  const topicTerms = [...new Set(splitTopicTerms(input.topicName))];
+  const includeTerms = [...new Set(input.includeKeywords.map(safeTerm).filter(Boolean))];
+  const allTerms = [...new Set([...topicTerms, ...includeTerms])];
+
+  const toQuery = (terms: string[]) => terms
+    .filter(Boolean)
+    .map((term) => `"${term.replace(/"/g, "")}"`)
+    .join(" OR ");
+
+  const queries = [
+    toQuery(allTerms),
+    toQuery(topicTerms)
+  ].filter(Boolean);
+
+  return [...new Set(queries)];
 }
 
 function resolveArticleUrl(rawLink: string): URL | null {
   try {
     const link = new URL(rawLink);
-    if (link.protocol !== "https:") return null;
+    if (link.protocol !== "https:" || link.username || link.password) return null;
 
-    // Bing RSS commonly wraps publisher links in /news/apiclick.aspx?url=...
+    // Bing wraps publisher URLs in /news/apiclick.aspx?url=<encoded article URL>.
     const target = link.searchParams.get("url");
     if (target) {
       const article = new URL(target, link);
-      if (article.protocol !== "https:" || article.username || article.password) return null;
+      if (
+        (article.protocol !== "https:" && article.protocol !== "http:") ||
+        article.username ||
+        article.password
+      ) return null;
       return article;
     }
 
-    if (link.username || link.password) return null;
     return link;
   } catch {
     return null;
   }
 }
 
-export async function searchBingNewsRss(
-  input: NewsSearchInput
-): Promise<CollectedNewsItem[]> {
-  const query = buildBingNewsQuery(input);
-  if (!query) throw new Error("Bing News RSS query was empty.");
-
+async function fetchBingNewsQuery(
+  query: string,
+  queryVariant: BingAttemptDiagnostic["queryVariant"],
+  excludeKeywords: string[]
+): Promise<{ items: CollectedNewsItem[]; diagnostic: BingAttemptDiagnostic }> {
   const url = new URL("https://www.bing.com/news/search");
   url.searchParams.set("q", query);
   url.searchParams.set("format", "rss");
@@ -104,7 +142,7 @@ export async function searchBingNewsRss(
     const retryAfter = response.headers.get("retry-after") ?? "not provided";
     let bodyPreview = "";
     try {
-      bodyPreview = (await response.text()).replace(/\s+/g, " ").trim().slice(0, 300);
+      bodyPreview = (await response.text()).replace(/\\s+/g, " ").trim().slice(0, 300);
     } catch {
       bodyPreview = "response body could not be read";
     }
@@ -113,15 +151,18 @@ export async function searchBingNewsRss(
     );
   }
 
+  const contentType = response.headers.get("content-type") ?? "unknown";
   const xml = await response.text();
   if (xml.length > 2_000_000) {
     throw new Error("Bing News RSS response exceeded the 2 MB safety limit.");
   }
   if (!xml.trim().startsWith("<?xml") && !xml.includes("<rss")) {
-    throw new Error("Bing News RSS returned a non-RSS response.");
+    throw new Error(
+      `Bing News RSS returned a non-RSS response; content-type=${contentType}; body=${xml.replace(/\\s+/g, " ").trim().slice(0, 220)}`
+    );
   }
 
-  let parsed: { rss?: { channel?: { item?: unknown | unknown[] } } };
+  let parsed: { rss?: { channel?: { item?: unknown | unknown[]; [key: string]: unknown } } };
   try {
     parsed = parser.parse(xml) as typeof parsed;
   } catch (error) {
@@ -129,32 +170,51 @@ export async function searchBingNewsRss(
     throw new Error(`Bing News RSS XML parsing failed: ${detail.slice(0, 250)}`);
   }
 
-  if (!parsed.rss?.channel) {
+  const channel = parsed.rss?.channel;
+  if (!channel) {
     const rootKeys = Object.keys(parsed as Record<string, unknown>).slice(0, 8).join(", ") || "none";
     throw new Error(`Bing News RSS XML had an unexpected structure; root elements: ${rootKeys}`);
   }
 
-  const rawItems = parsed.rss.channel.item;
-  if (!rawItems) return [];
-
-  const excluded = input.excludeKeywords
-    .map((keyword) => keyword.toLocaleLowerCase())
-    .filter(Boolean);
+  const channelKeys = Object.keys(channel).slice(0, 12);
+  const rawItems = channel.item;
+  const rawList = rawItems ? (Array.isArray(rawItems) ? rawItems : [rawItems]) : [];
+  const excluded = excludeKeywords.map((keyword) => keyword.toLocaleLowerCase()).filter(Boolean);
   const collected: CollectedNewsItem[] = [];
-  const rawList = Array.isArray(rawItems) ? rawItems : [rawItems];
+  let missingTitleCount = 0;
+  let missingLinkCount = 0;
+  let invalidUrlCount = 0;
+  let excludedCount = 0;
 
   for (const raw of rawList) {
     if (!raw || typeof raw !== "object") continue;
     const item = raw as Record<string, unknown>;
     const title = asText(item.title);
     const rawLink = asText(item.link);
-    const articleUrl = resolveArticleUrl(rawLink);
-    if (!title || !articleUrl) continue;
 
-    const sourceName = asText(item.source) || articleUrl.hostname.replace(/^www\./i, "");
+    if (!title) {
+      missingTitleCount += 1;
+      continue;
+    }
+    if (!rawLink) {
+      missingLinkCount += 1;
+      continue;
+    }
+
+    const articleUrl = resolveArticleUrl(rawLink);
+    if (!articleUrl) {
+      invalidUrlCount += 1;
+      continue;
+    }
+
+    const sourceName = asText(item["News:Source"] ?? item.source)
+      || articleUrl.hostname.replace(/^www\\./i, "");
     const excerpt = cleanExcerpt(asText(item.description));
     const searchable = `${title} ${sourceName} ${excerpt ?? ""}`.toLocaleLowerCase();
-    if (excluded.some((keyword) => searchable.includes(keyword.toLocaleLowerCase()))) continue;
+    if (excluded.some((keyword) => searchable.includes(keyword))) {
+      excludedCount += 1;
+      continue;
+    }
 
     const publishedText = asText(item.pubDate);
     const timestamp = publishedText ? Date.parse(publishedText) : Number.NaN;
@@ -170,5 +230,57 @@ export async function searchBingNewsRss(
     if (collected.length >= 10) break;
   }
 
-  return collected;
+  const diagnostic: BingAttemptDiagnostic = {
+    queryVariant,
+    rssItemCount: rawList.length,
+    acceptedCount: collected.length,
+    missingTitleCount,
+    missingLinkCount,
+    invalidUrlCount,
+    excludedCount,
+    channelKeys
+  };
+
+  console.info("[NewsForMe][RSS] Bing News RSS response parsed", {
+    queryVariant,
+    httpStatus: response.status,
+    contentType,
+    responseBytes: new TextEncoder().encode(xml).length,
+    ...diagnostic
+  });
+
+  return { items: collected, diagnostic };
+}
+
+export async function searchBingNewsRss(
+  input: NewsSearchInput
+): Promise<BingNewsSearchResult> {
+  const queries = buildBingNewsQueries(input);
+  if (queries.length === 0) throw new Error("Bing News RSS query was empty.");
+
+  const diagnostics: BingAttemptDiagnostic[] = [];
+  const variants: BingAttemptDiagnostic["queryVariant"][] =
+    queries.length > 1
+      ? ["topic-and-keywords", "topic-only"]
+      : ["topic-and-keywords"];
+
+  for (let index = 0; index < queries.length; index += 1) {
+    const result = await fetchBingNewsQuery(
+      queries[index],
+      variants[index],
+      input.excludeKeywords
+    );
+    diagnostics.push(result.diagnostic);
+
+    if (result.items.length > 0) {
+      return { items: result.items, diagnostics };
+    }
+  }
+
+  console.warn("[NewsForMe][RSS] Bing News RSS returned no usable articles", {
+    queryVariantCount: queries.length,
+    diagnostics
+  });
+
+  return { items: [], diagnostics };
 }
