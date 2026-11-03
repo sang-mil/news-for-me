@@ -1,48 +1,49 @@
-﻿{
-    "$schema":  "../../node_modules/wrangler/config-schema.json",
-    "name":  "news-for-me-api",
-    "main":  "src/index.ts",
-    "compatibility_date":  "2026-11-02",
-    "observability":  {
-                          "enabled":  true
-                      },
-    "vars":  {
-                 "ALLOWED_ORIGIN": "http://127.0.0.1:5173,http://localhost:5173"
-             },
-    "d1_databases":  [
-                         {
-                             "binding":  "DB",
-                             "database_name":  "news-for-me-db",
-                             "database_id":  "00000000-0000-4000-8000-000000000001",
-                             "migrations_dir":  "migrations"
-                         }
-                     ],
-    "queues":  {
-                   "producers":  [
-                                     {
-                                         "binding":  "NEWS_QUEUE",
-                                         "queue":  "news-for-me-collection"
-                                     }
-                                 ],
-                   "consumers":  [
-                                     {
-                                         "queue":  "news-for-me-collection",
-                                         "max_batch_size":  5,
-                                         "max_batch_timeout":  1,
-                                         "max_retries":  3,
-                                         "dead_letter_queue":  "news-for-me-collection-dlq"
-                                     },
-                                     {
-                                         "queue":  "news-for-me-collection-dlq",
-                                         "max_batch_size":  5,
-                                         "max_batch_timeout":  1,
-                                         "max_retries":  3
-                                     }
-                                 ]
-               },
-    "triggers":  {
-                     "crons":  [
-                                   "0 15 * * 0"
-                               ]
-                 }
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "news-for-me-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-02",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "ALLOWED_ORIGIN": "http://127.0.0.1:5173,http://localhost:5173,https://news-for-me.pages.dev",
+    "BETTER_AUTH_URL": "https://news-for-me.pages.dev"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "news-for-me-db",
+      "database_id": "00000000-0000-4000-8000-000000000001",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "NEWS_QUEUE",
+        "queue": "news-for-me-collection"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "news-for-me-collection",
+        "max_batch_size": 5,
+        "max_batch_timeout": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "news-for-me-collection-dlq"
+      },
+      {
+        "queue": "news-for-me-collection-dlq",
+        "max_batch_size": 5,
+        "max_batch_timeout": 1,
+        "max_retries": 3
+      }
+    ]
+  },
+  "triggers": {
+    "crons": [
+      "0 15 * * 0"
+    ]
+  }
 }
