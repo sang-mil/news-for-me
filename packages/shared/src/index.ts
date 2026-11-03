@@ -53,6 +53,10 @@ export interface CollectionRun {
 export interface CollectionStartResponse {
   data: { runId: string; status: "queued"; };
 }
+
+export interface CollectionRequest {
+  maxArticles?: number;
+}
 export interface CollectionRunResponse { data: CollectionRun; }
 export interface NewsArticleListResponse { data: NewsArticle[]; }
 

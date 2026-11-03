@@ -39,8 +39,23 @@ export async function handleCollectionRequest(
   }
 
   if (collectMatch && request.method === "POST") {
+    let payload: unknown = {};
+    try {
+      const rawBody = await request.text();
+      if (rawBody.trim()) payload = JSON.parse(rawBody);
+    } catch {
+      return jsonResponse({ error: "Request body must contain valid JSON." }, 400, allowedOrigin);
+    }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return jsonResponse({ error: "Request body must be a JSON object." }, 400, allowedOrigin);
+    }
+    const requestedMax = (payload as { maxArticles?: unknown }).maxArticles;
+    const maxArticles = requestedMax === undefined ? 10 : requestedMax;
+    if (!Number.isInteger(maxArticles) || (maxArticles as number) < 5 || (maxArticles as number) > 30) {
+      return jsonResponse({ error: "maxArticles must be an integer between 5 and 30." }, 400, allowedOrigin);
+    }
     const runId = await createCollectionRun(db, topicId);
-    const message: CollectionJobMessage = { runId, topicId, userId };
+    const message: CollectionJobMessage = { runId, topicId, userId, maxArticles: maxArticles as number };
     try {
       await queue.send(message);
     } catch (error) {

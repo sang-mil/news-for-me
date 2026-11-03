@@ -7,6 +7,8 @@ import {
 } from "../../db/repositories/news";
 import { googleNewsRssSource } from "../../services/news/sources/google-news-rss";
 import { searchBingNewsRss } from "../../services/news/sources/bing-news-rss";
+import { searchGitHubRepositories } from "../../services/news/sources/github-search";
+import { searchV2exTopics } from "../../services/news/sources/v2ex";
 import { summarizeCollectedArticles } from "../../services/ai/summarizer";
 import type { AIEnvironment } from "../../services/ai/types";
 import type { CollectionJobMessage } from "../../services/news/types";
@@ -35,76 +37,61 @@ async function processCollectionJob(
   const topic = await getTopicForCollection(env.DB, job.userId, job.topicId);
   if (!topic) throw new Error("Topic no longer exists or is inactive.");
 
+  const maxArticles = Math.min(30, Math.max(5, Math.floor(job.maxArticles ?? 10)));
   const searchInput = {
     topicName: topic.name,
     includeKeywords: parseKeywords(topic.include_keywords_json),
-    excludeKeywords: parseKeywords(topic.exclude_keywords_json)
+    excludeKeywords: parseKeywords(topic.exclude_keywords_json),
+    maxResults: maxArticles
   };
 
-  let items: Awaited<ReturnType<typeof googleNewsRssSource.search>> = [];
-  let googleFailure: string | null = null;
-  let collectionNote: string | null = null;
-
-  try {
-    items = await googleNewsRssSource.search(searchInput);
-    if (items.length === 0) {
-      googleFailure = "Google News RSS responded successfully but returned 0 matching articles.";
-      console.warn("[NewsForMe][RSS] Google News RSS returned 0 articles; trying Bing fallback", {
-        runId: job.runId,
-        topicId: job.topicId
+  const sources = [
+    { id: "google-news-rss", search: () => googleNewsRssSource.search(searchInput) },
+    { id: "bing-news-rss", search: async () => (await searchBingNewsRss(searchInput, maxArticles)).items },
+    { id: "github-search", search: () => searchGitHubRepositories(searchInput, maxArticles) },
+    { id: "v2ex-public-api", search: () => searchV2exTopics(searchInput, maxArticles) }
+  ];
+  const settled = await Promise.allSettled(sources.map((source) => source.search()));
+  const failures: string[] = [];
+  const combined = settled.flatMap((result, index) => {
+    if (result.status === "fulfilled") {
+      console.info("[NewsForMe][RSS] source completed", {
+        runId: job.runId, topicId: job.topicId,
+        source: sources[index].id, articlesFound: result.value.length
       });
-    } else {
-      console.info("[NewsForMe][RSS] Google News RSS succeeded", {
-        runId: job.runId,
-        topicId: job.topicId,
-        articlesFound: items.length
-      });
+      return result.value;
     }
-  } catch (error) {
-    googleFailure = error instanceof Error ? error.message : String(error);
-    console.warn("[NewsForMe][RSS] Google News RSS failed; trying Bing fallback", {
-      runId: job.runId,
-      topicId: job.topicId,
-      error: googleFailure
+    const detail = result.reason instanceof Error ? result.reason.message : String(result.reason);
+    failures.push(`${sources[index].id}: ${detail.slice(0, 240)}`);
+    console.warn("[NewsForMe][RSS] source failed", {
+      runId: job.runId, topicId: job.topicId, source: sources[index].id, error: detail
     });
+    return [];
+  });
+
+  if (settled.every((result) => result.status === "rejected")) {
+    throw new Error(`All news sources failed. ${failures.join(" | ")}`);
   }
 
-  if (items.length === 0) {
+  const seenUrls = new Set<string>();
+  const items = combined.filter((item) => {
     try {
-      const bingResult = await searchBingNewsRss(searchInput);
-      items = bingResult.items;
-
-      if (items.length > 0) {
-        collectionNote = `Google News RSS unavailable or empty (${googleFailure ?? "no details"}). Bing News RSS fallback collected ${items.length} articles. Search diagnostics: ${JSON.stringify(bingResult.diagnostics)}`;
-        console.info("[NewsForMe][RSS] Bing News RSS fallback succeeded", {
-          runId: job.runId,
-          topicId: job.topicId,
-          articlesFound: items.length,
-          primaryError: googleFailure,
-          bingDiagnostics: bingResult.diagnostics
-        });
-      } else {
-        collectionNote = `Google News RSS unavailable or empty (${googleFailure ?? "no details"}). Bing News RSS returned 0 usable articles. Search diagnostics: ${JSON.stringify(bingResult.diagnostics)}`;
-        console.warn("[NewsForMe][RSS] both sources returned no usable articles", {
-          runId: job.runId,
-          topicId: job.topicId,
-          primaryError: googleFailure,
-          bingDiagnostics: bingResult.diagnostics
-        });
-      }
-    } catch (error) {
-      const fallbackFailure = error instanceof Error ? error.message : String(error);
-      console.error("[NewsForMe][RSS] all RSS sources failed", {
-        runId: job.runId,
-        topicId: job.topicId,
-        googleError: googleFailure,
-        bingError: fallbackFailure
-      });
-      throw new Error(
-        `All news RSS sources failed. Google News RSS: ${googleFailure ?? "no usable articles"}; Bing News RSS: ${fallbackFailure}`
-      );
+      const normalized = new URL(item.url);
+      normalized.hash = "";
+      const key = normalized.toString();
+      if (seenUrls.has(key)) return false;
+      seenUrls.add(key);
+      return true;
+    } catch {
+      return false;
     }
-  }
+  }).slice(0, maxArticles);
+
+  const collectionNote = [
+    `Requested up to ${maxArticles} articles.`,
+    `Sources: ${[...new Set(items.map((item) => item.provider))].join(", ") || "none"}.`,
+    failures.length ? `Partial source failures: ${failures.join(" | ")}` : null
+  ].filter(Boolean).join(" ");
 
   const storedArticles = await storeCollectedArticles(env.DB, job, items, collectionNote);
   const result = await summarizeCollectedArticles(

@@ -81,3 +81,22 @@
 @media (max-width: 560px) {
   .topic-actions-column { flex-direction: column; }
 }
+
+.collection-limit-control {
+  display: grid;
+  gap: 5px;
+  color: #778295;
+  font-size: 10px;
+  font-weight: 700;
+}
+.collection-limit-control select {
+  width: 100%;
+  min-width: 76px;
+  padding: 7px 8px;
+  border: 1px solid #e8ebf2;
+  border-radius: 7px;
+  color: #3b4962;
+  background: #fff;
+  font: inherit;
+  font-size: 11px;
+}

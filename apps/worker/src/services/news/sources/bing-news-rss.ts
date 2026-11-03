@@ -116,7 +116,8 @@ function resolveArticleUrl(rawLink: string): URL | null {
 async function fetchBingNewsQuery(
   query: string,
   queryVariant: BingAttemptDiagnostic["queryVariant"],
-  excludeKeywords: string[]
+  excludeKeywords: string[],
+  maxResults: number
 ): Promise<{ items: CollectedNewsItem[]; diagnostic: BingAttemptDiagnostic }> {
   const url = new URL("https://www.bing.com/news/search");
   url.searchParams.set("q", query);
@@ -227,7 +228,7 @@ async function fetchBingNewsQuery(
       provider: "bing-news-rss"
     });
 
-    if (collected.length >= 10) break;
+    if (collected.length >= maxResults) break;
   }
 
   const diagnostic: BingAttemptDiagnostic = {
@@ -252,7 +253,8 @@ async function fetchBingNewsQuery(
 }
 
 export async function searchBingNewsRss(
-  input: NewsSearchInput
+  input: NewsSearchInput,
+  maxResults = input.maxResults ?? 10
 ): Promise<BingNewsSearchResult> {
   const queries = buildBingNewsQueries(input);
   if (queries.length === 0) throw new Error("Bing News RSS query was empty.");
@@ -267,7 +269,8 @@ export async function searchBingNewsRss(
     const result = await fetchBingNewsQuery(
       queries[index],
       variants[index],
-      input.excludeKeywords
+      input.excludeKeywords,
+      maxResults
     );
     diagnostics.push(result.diagnostic);
 
