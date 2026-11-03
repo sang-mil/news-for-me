@@ -288,23 +288,63 @@ export default function App() {
     <main className="page-shell">
       <header className="topbar">
         <a className="brand" href="/" aria-label="News for Me 홈">
-          <span className="brand-mark">N</span><span>News for Me</span>
+          <span className="brand-mark" aria-hidden="true">n.</span>
+          <span className="brand-wordmark">News for Me<span>YOUR PERSONAL NEWSROOM</span></span>
         </a>
-        <div className={`connection-status ${status}`}>
+        <nav className="top-nav" aria-label="주요 메뉴">
+          <a href="#archive">보관함</a>
+          <a href="#topics">관심 주제</a>
+          <a className="top-nav-cta" href="#topic-form">주제 추가 <span aria-hidden="true">↗</span></a>
+        </nav>
+        <div className={`connection-status ${status}`} aria-live="polite">
           <span className="status-light" />
-          {status === "checking" ? "연결 확인 중" : status === "online" ? "로컬 API 연결됨" : "API 연결 확인 필요"}
+          {status === "checking" ? "연결 확인 중" : status === "online" ? "API 연결됨" : "연결 확인 필요"}
         </div>
       </header>
 
-      <section className="intro-section">
-        <div className="eyebrow">PERSONAL NEWS WORKSPACE</div>
-        <h1>관심 있는 소식만,<br /><span>놓치지 않도록.</span></h1>
-        <p className="intro-copy">관심 주제를 등록하고 뉴스를 수집하세요. 스크랩한 기사는 개인 메모와 태그를 붙여 나만의 뉴스 아카이브로 보관할 수 있습니다.</p>
-        <div className="intro-meta">
-          <span className="meta-icon">✳</span>
-          <span>D1 데이터베이스에 자동 저장됩니다.</span>
-          {health && <span className="meta-time">API 확인 {new Date(health.timestamp).toLocaleTimeString("ko-KR")}</span>}
+      <section className="intro-section" aria-labelledby="hero-title">
+        <div className="intro-main">
+          <div className="eyebrow"><span className="eyebrow-mark" /> YOUR PERSONAL NEWSROOM · VOL. 01</div>
+          <h1 id="hero-title">관심을 따라 읽고,<br /><span>나만의 흐름을 만듭니다.</span></h1>
+          <p className="intro-copy">관심 주제를 정하면 필요한 뉴스를 한곳에 모읍니다. 기억하고 싶은 기사는 스크랩하고, 메모와 태그로 나만의 맥락을 쌓아 보세요.</p>
+          <div className="intro-meta">
+            <span className="meta-icon" aria-hidden="true">✳</span>
+            <span>D1에 저장되는 나만의 뉴스 아카이브</span>
+            {health && <span className="meta-time">마지막 연결 {new Date(health.timestamp).toLocaleTimeString("ko-KR")}</span>}
+          </div>
+          <div className="hero-actions">
+            <a className="hero-primary-link" href="#topics">관심 주제 살펴보기 <span aria-hidden="true">↘</span></a>
+            <span className="hero-note">세상의 소음보다, 나에게 중요한 신호.</span>
+          </div>
         </div>
+
+        <aside className="hero-panel" aria-label="내 뉴스룸 현황">
+          <div className="hero-panel-core">
+            <div className="hero-panel-header">
+              <span>THE DAILY EDITION</span>
+              <span className={`hero-sync ${status}`}><i />{status === "online" ? "SYNCED" : status === "checking" ? "CONNECTING" : "OFFLINE"}</span>
+            </div>
+            <div className="hero-art" aria-hidden="true">
+              <span className="hero-orbit hero-orbit-one" />
+              <span className="hero-orbit hero-orbit-two" />
+              <span className="hero-signal signal-one" />
+              <span className="hero-signal signal-two" />
+              <span className="hero-signal signal-three" />
+              <span className="hero-art-letter">n</span>
+              <span className="hero-art-index">N° 01</span>
+            </div>
+            <div className="hero-panel-copy">
+              <span>YOUR SIGNAL, NOT THE NOISE</span>
+              <h2>오늘의 관심이<br />내일의 인사이트가 되도록.</h2>
+            </div>
+            <div className="hero-stats">
+              <div><strong>{topics.length.toString().padStart(2, "0")}</strong><span>관심 주제</span></div>
+              <div><strong>{scraps.length.toString().padStart(2, "0")}</strong><span>보관한 기사</span></div>
+              <div><strong>{tags.length.toString().padStart(2, "0")}</strong><span>나만의 태그</span></div>
+            </div>
+            <div className="hero-panel-footer"><span>CURATED FOR YOU</span><span>NEWS / FOR ME</span></div>
+          </div>
+        </aside>
       </section>
 
       {(error || notice) && (
@@ -314,9 +354,9 @@ export default function App() {
         </div>
       )}
 
-      <section className="scraps-section">
+      <section className="scraps-section" id="archive" aria-labelledby="archive-title">
         <div className="section-heading archive-heading">
-          <div><div className="section-kicker">PERSONAL ARCHIVE</div><h2>스크랩 보관함 <span className="count-badge">{scraps.length}개</span></h2></div>
+          <div><div className="section-kicker">PERSONAL ARCHIVE</div><h2 id="archive-title">스크랩 보관함 <span className="count-badge">{scraps.length}개</span></h2></div>
           <form className="archive-create-tag" onSubmit={(event) => void handleCreateTag(event)}>
             <input aria-label="새 태그 이름" value={newTagName} onChange={(event) => setNewTagName(event.target.value)} maxLength={30} placeholder="새 태그 이름" required />
             <input aria-label="태그 색상" type="color" value={newTagColor} onChange={(event) => setNewTagColor(event.target.value)} />
@@ -426,9 +466,9 @@ export default function App() {
       </section>
 
       <section className="workspace-grid">
-        <section className="topics-section">
+        <section className="topics-section" id="topics" aria-labelledby="topics-title">
           <div className="section-heading">
-            <div><div className="section-kicker">YOUR TOPICS</div><h2>관심 항목</h2></div>
+            <div><div className="section-kicker">YOUR TOPICS</div><h2 id="topics-title">관심 항목</h2></div>
             <span className="count-badge">{topics.length}개</span>
           </div>
 
