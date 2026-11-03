@@ -1,4 +1,5 @@
 import type { CollectedNewsItem, NewsSearchInput } from "../types";
+import { matchesTopicRelevance } from "../relevance";
 
 interface GitHubRepository {
   full_name?: string;
@@ -26,10 +27,10 @@ export async function searchGitHubRepositories(
   const terms = [...new Set([
     ...splitTerms(input.topicName),
     ...input.includeKeywords.flatMap(splitTerms)
-  ])].slice(0, 6);
+  ])].filter((term) => term.length >= 2).slice(0, 6);
   if (terms.length === 0) return [];
 
-  const query = `${terms.map((term) => `"${term}"`).join(" OR ")} in:name,description,readme`;
+  const query = `${terms.map((term) => `"${term}"`).join(" OR ")} in:name,description`;
   const url = new URL("https://api.github.com/search/repositories");
   url.searchParams.set("q", query);
   url.searchParams.set("sort", "updated");
@@ -64,6 +65,7 @@ export async function searchGitHubRepositories(
 
     const description = repository.description?.trim() ?? "";
     const searchable = `${fullName} ${description} ${repository.language ?? ""}`.toLocaleLowerCase();
+    if (!matchesTopicRelevance(input, searchable)) continue;
     if (excluded.some((keyword) => searchable.includes(keyword))) continue;
 
     const timestamp = repository.updated_at ? Date.parse(repository.updated_at) : Number.NaN;
