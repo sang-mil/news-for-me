@@ -6,6 +6,7 @@ export interface BetterAuthEnvironment {
   BETTER_AUTH_URL?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  AUTH_ALLOWED_EMAIL?: string;
   ALLOWED_ORIGIN?: string;
 }
 
@@ -14,7 +15,8 @@ export function isBetterAuthConfigured(env: BetterAuthEnvironment): boolean {
     env.BETTER_AUTH_SECRET?.trim() &&
     env.BETTER_AUTH_URL?.trim() &&
     env.GOOGLE_CLIENT_ID?.trim() &&
-    env.GOOGLE_CLIENT_SECRET?.trim()
+    env.GOOGLE_CLIENT_SECRET?.trim() &&
+    env.AUTH_ALLOWED_EMAIL?.trim()
   );
 }
 
