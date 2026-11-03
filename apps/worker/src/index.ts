@@ -8,7 +8,6 @@ import { createAuth, isBetterAuthConfigured } from "./services/auth/better-auth"
 import { resolveAppIdentity } from "./lib/authentication";
 import { handleAuthMigration } from "./routes/auth-migration";
 import { cleanupUnScrapedNews } from "./services/maintenance/article-cleanup";
-import { ensureDevelopmentUser } from "./lib/dev-user";
 import { jsonResponse } from "./lib/http";
 import { handleNewsCollectionQueue } from "./queues/consumers/news-collection";
 import type { AIEnvironment } from "./services/ai/types";
@@ -64,7 +63,7 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/api/_internal/auth-migrate") {
-      return handleAuthMigration(request, env);
+      return handleAuthMigration(request, env, allowedOrigin);
     }
 
     if (url.pathname.startsWith("/api/auth/")) {
@@ -132,7 +131,7 @@ export default {
       url.pathname.startsWith("/api/scraps/") ||
       url.pathname === "/api/tags" ||
       url.pathname.startsWith("/api/tags/") ||
-      /^\\/api\\/topics\\/[^/]+\\/articles\\/[^/]+\\/scrap$/.test(url.pathname);
+      /^\/api\/topics\/[^/]+\/articles\/[^/]+\/scrap$/.test(url.pathname);
 
     const isTopicsApi =
       url.pathname === "/api/topics" ||
@@ -181,7 +180,7 @@ export default {
       }
 
       try {
-        if (/^\\/api\\/topics\\/[^/]+\\/(collect|articles|collection-runs\\/[^/]+)$/.test(url.pathname)) {
+        if (/^\/api\/topics\/[^/]+\/(collect|articles|collection-runs\/[^/]+)$/.test(url.pathname)) {
           return await handleCollectionRequest(
             request,
             env.DB,
