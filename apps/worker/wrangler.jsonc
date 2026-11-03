@@ -8,7 +8,13 @@
   },
   "vars": {
     "ALLOWED_ORIGIN": "http://127.0.0.1:5173,http://localhost:5173,https://news-for-me.pages.dev",
-    "BETTER_AUTH_URL": "https://news-for-me.pages.dev"
+    "BETTER_AUTH_URL": "https://news-for-me.pages.dev",
+    "GEMINI_MODEL_PRIMARY": "gemini-3.8-flash",
+    "GEMINI_MODEL_FALLBACK": "gemini-3.5-flash-lite",
+    "OPENROUTER_MODEL": "openrouter/free",
+    "OPENROUTER_ALLOW_PAID": "false",
+    "OPENROUTER_SITE_URL": "https://news-for-me.pages.dev",
+    "OPENROUTER_APP_TITLE": "News for Me"
   },
   "d1_databases": [
     {
