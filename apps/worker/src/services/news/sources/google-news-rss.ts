@@ -1,5 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import type { CollectedNewsItem, NewsSearchInput, NewsSource } from "../types";
+import { matchesTopicRelevance } from "../relevance";
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -64,7 +65,7 @@ export function buildGoogleNewsQuery(
 
 export async function searchGoogleNewsRss(
   query: string,
-  excludeKeywords: string[],
+  input: NewsSearchInput,
   maxResults = 10
 ): Promise<CollectedNewsItem[]> {
   const url = new URL("https://news.google.com/rss/search");
@@ -113,7 +114,7 @@ export async function searchGoogleNewsRss(
   if (!rawItems) return [];
 
   const items = Array.isArray(rawItems) ? rawItems : [rawItems];
-  const excluded = excludeKeywords
+  const excluded = input.excludeKeywords
     .map((keyword) => keyword.toLocaleLowerCase())
     .filter(Boolean);
   const collected: CollectedNewsItem[] = [];
@@ -138,6 +139,7 @@ export async function searchGoogleNewsRss(
     if (parsedLink.protocol !== "https:") continue;
 
     const searchable = `${title} ${sourceName ?? ""} ${excerpt ?? ""}`.toLocaleLowerCase();
+    if (!matchesTopicRelevance(input, searchable)) continue;
     if (excluded.some((keyword) => searchable.includes(keyword))) continue;
 
     const timestamp = pubDate ? Date.parse(pubDate) : Number.NaN;
@@ -165,6 +167,6 @@ export const googleNewsRssSource: NewsSource = {
       input.includeKeywords,
       input.excludeKeywords
     );
-    return searchGoogleNewsRss(query, input.excludeKeywords, input.maxResults ?? 10);
+    return searchGoogleNewsRss(query, input, input.maxResults ?? 10);
   }
 };

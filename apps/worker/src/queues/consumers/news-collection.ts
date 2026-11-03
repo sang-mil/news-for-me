@@ -8,11 +8,13 @@ import { searchBingNewsRss } from "../../services/news/sources/bing-news-rss";
 import { searchGitHubRepositories } from "../../services/news/sources/github-search";
 import { searchV2exTopics } from "../../services/news/sources/v2ex";
 import { createYouTubeVideosSource } from "../../services/news/sources/youtube";
+import { createXPostsSource } from "../../services/news/sources/x";
+import { isSoftwareOrTechTopic } from "../../services/news/relevance";
 import { summarizeCollectedArticles } from "../../services/ai/summarizer";
 import type { AIEnvironment } from "../../services/ai/types";
 import type { CollectionJobMessage, NewsSource } from "../../services/news/types";
 
-interface CollectionConsumerEnv extends AIEnvironment { DB: D1Database; YOUTUBE_API_KEY?: string; }
+interface CollectionConsumerEnv extends AIEnvironment { DB: D1Database; YOUTUBE_API_KEY?: string; X_BEARER_TOKEN?: string; }
 
 function parseKeywords(value: string): string[] {
   try {
@@ -30,14 +32,31 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
   const searchInput = { topicName: topic.name, includeKeywords: parseKeywords(topic.include_keywords_json), excludeKeywords: parseKeywords(topic.exclude_keywords_json), maxResults: maxArticles };
   const sources: NewsSource[] = [
     googleNewsRssSource,
-    { id: "bing-news-rss", contentType: "article", search: async (input) => (await searchBingNewsRss(input)).items },
-    { id: "github-search", contentType: "repository", search: (input) => searchGitHubRepositories(input) },
-    { id: "v2ex-public-api", contentType: "discussion", search: (input) => searchV2exTopics(input) }
+    { id: "bing-news-rss", contentType: "article", search: async (input) => (await searchBingNewsRss(input)).items }
   ];
+  const skippedSources: string[] = [];
+  const softwareTopic = isSoftwareOrTechTopic(searchInput);
+
+  if (softwareTopic) {
+    sources.push(
+      { id: "github-search", contentType: "repository", search: (input) => searchGitHubRepositories(input) },
+      { id: "v2ex-public-api", contentType: "discussion", search: (input) => searchV2exTopics(input) }
+    );
+  } else {
+    skippedSources.push("github-search (not a software/technology topic)", "v2ex-public-api (not a software/technology topic)");
+  }
+
   if (env.YOUTUBE_API_KEY?.trim()) {
     sources.push(createYouTubeVideosSource(env.YOUTUBE_API_KEY.trim()));
   } else {
-    console.info("[NewsForMe][YouTube] source skipped because YOUTUBE_API_KEY is not configured");
+    skippedSources.push("youtube-data-api (missing YOUTUBE_API_KEY)");
+    console.warn("[NewsForMe][YouTube] source skipped: YOUTUBE_API_KEY is not available in this Worker deployment");
+  }
+
+  if (env.X_BEARER_TOKEN?.trim()) {
+    sources.push(createXPostsSource(env.X_BEARER_TOKEN.trim()));
+  } else {
+    skippedSources.push("x-api (missing X_BEARER_TOKEN)");
   }
   const collection = await collectFromSources(sources, searchInput, maxArticles);
   const sourceSummary = Object.entries(collection.sourceCounts).map(([id, count]) => id + "=" + count).join(", ");
@@ -45,7 +64,8 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
   const collectionNote = [
     "Requested up to " + maxArticles + " items.",
     "Source counts: " + (sourceSummary || "none") + ".",
-    failureSummary ? "Partial source failures: " + failureSummary : null
+    failureSummary ? "Partial source failures: " + failureSummary : null,
+    skippedSources.length ? "Skipped sources: " + skippedSources.join(", ") : null
   ].filter(Boolean).join(" ");
 
   const storedArticles = await storeCollectedArticles(env.DB, job, collection.items, collectionNote);

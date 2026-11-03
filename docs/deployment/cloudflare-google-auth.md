@@ -148,6 +148,19 @@ GEMINI_PROJECT_SLOT_1과 GEMINI_PROJECT_SLOT_2는 Secret이 아닌 일반 변수
 
 GMAIL_SENDER는 Worker 대시보드의 Variables 또는 Secret로 등록합니다. 코드상 테스트 발송 수신자는 로그인한 이메일로 고정되어 있으며, 다른 주소를 클라이언트가 지정할 수 없습니다.
 
+## 뉴스 수집 소스 설정
+
+YouTube와 X는 선택형 소스입니다. Worker Secret에 등록되어야 Queue Consumer 실행 시 사용할 수 있습니다.
+
+~~~powershell
+npx wrangler secret put YOUTUBE_API_KEY
+npx wrangler secret put X_BEARER_TOKEN
+~~~
+
+두 값은 로컬 `.dev.vars` 또는 Cloudflare Worker Secret으로만 관리하고 프론트엔드 변수나 저장소에 넣지 마세요. YouTube Data API `search.list`의 기본 할당량은 100회/일입니다. X는 현재 게시물 읽기 리소스당 과금되며 공개 단가는 게시물 1건당 USD 0.005입니다. X 최근 검색 API는 요청당 최소 10개 결과를 요구하므로, X 개발자 콘솔에서 사용 한도와 지출 한도를 설정하세요.
+
+GitHub 저장소와 V2EX는 개발/기술 관련 주제에서만 검색합니다. 뉴스, YouTube, X 결과는 주제명 또는 포함 키워드와 실제 텍스트가 일치하는 경우에만 저장됩니다.
+
 ## 5. Worker 배포
 
 ~~~powershell
