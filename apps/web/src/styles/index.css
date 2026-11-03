@@ -1089,3 +1089,5 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .account-email { max-width: 100px; }
   .sign-out-button { padding: 7px 9px; font-size: 8px; }
 }
+
+.auth-loading { margin: 24px 0 0; color: #778073; font-size: 12px; text-align: center; }
