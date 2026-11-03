@@ -45,6 +45,17 @@ OAuth 동의 화면이 아직 Testing이라면 Google Auth Platform의 Test user
 
 ## 2. Cloudflare 리소스 생성
 
+**기존 로컬 데이터를 운영 DB로 옮길 계획이라면, 반드시 D1 ID를 바꾸기 전에 로컬 DB를 먼저 내보내세요.** Wrangler 로컬 D1은 설정의 database_id에 연결되므로 운영 ID로 교체한 뒤에는 기존 로컬 DB 대신 새 로컬 저장소를 바라볼 수 있습니다.
+
+PowerShell에서 Worker 디렉터리로 이동해 내보냅니다.
+
+~~~powershell
+Set-Location C:\dev\news-for-me\apps\worker
+npx wrangler d1 export news-for-me-db --local --no-schema --output .\local-news-data.sql
+~~~
+
+내보낸 SQL을 열어 users와 앱 데이터의 INSERT 문만 포함되어 있는지 확인하세요. 이 파일은 비밀값은 아니지만 개인 뉴스/메모가 포함될 수 있으므로 Git에 올리지 마세요.
+
 PowerShell에서 저장소 루트로 이동합니다.
 
 ~~~powershell
@@ -83,11 +94,7 @@ npx wrangler d1 migrations apply news-for-me-db --remote
 
 ## 3. 기존 로컬 데이터 이전
 
-로컬 데이터가 필요하다면 먼저 로컬 DB를 백업하고 내보냅니다. Wrangler 버전에 따라 export 옵션을 확인하세요.
-
-~~~powershell
-npx wrangler d1 export news-for-me-db --local --no-schema --output .\local-news-data.sql
-~~~
+로컬 내보내기 파일이 앞 단계에서 준비되어 있다면 운영 DB로 가져옵니다.
 
 이 SQL을 운영 DB에 적용합니다.
 
