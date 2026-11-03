@@ -10,6 +10,7 @@ interface V2exTopic {
   last_modified?: number;
   node?: { title?: string; name?: string };
   member?: { username?: string };
+  replies?: number;
 }
 
 function termsFor(input: NewsSearchInput): string[] {
@@ -75,7 +76,11 @@ export async function searchV2exTopics(
       sourceName: `V2EX · ${node}`,
       publishedAt: Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null,
       excerpt: content.slice(0, 2000) || null,
-      provider: "v2ex-public-api"
+      provider: "v2ex-public-api",
+      contentType: "discussion",
+      externalId: String(topic.id),
+      author: topic.member?.username ?? null,
+      engagement: { replies: typeof topic.replies === "number" ? topic.replies : null }
     });
     if (items.length >= maxResults) break;
   }

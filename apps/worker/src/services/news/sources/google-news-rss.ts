@@ -158,6 +158,7 @@ export async function searchGoogleNewsRss(
 
 export const googleNewsRssSource: NewsSource = {
   id: "google-news-rss",
+  contentType: "article",
   async search(input: NewsSearchInput): Promise<CollectedNewsItem[]> {
     const query = buildGoogleNewsQuery(
       input.topicName,

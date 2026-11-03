@@ -15,7 +15,7 @@ interface GitHubSearchResponse {
 
 function splitTerms(value: string): string[] {
   return value.split(/[,，;；|]+/)
-    .map((term) => term.replace(/["\\\\]/g, " ").replace(/\\s+/g, " ").trim())
+    .map((term) => term.replace(/["\\]/g, " ").replace(/\s+/g, " ").trim())
     .filter(Boolean);
 }
 
@@ -45,7 +45,7 @@ export async function searchGitHubRepositories(
     signal: AbortSignal.timeout(10_000)
   });
   if (!response.ok) {
-    const detail = (await response.text()).replace(/\\s+/g, " ").slice(0, 180);
+    const detail = (await response.text()).replace(/\s+/g, " ").slice(0, 180);
     throw new Error(`GitHub repository search returned HTTP ${response.status}: ${detail}`);
   }
 
@@ -81,7 +81,11 @@ export async function searchGitHubRepositories(
       sourceName: "GitHub",
       publishedAt: Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null,
       excerpt: [description, details].filter(Boolean).join(" · ").slice(0, 2000) || null,
-      provider: "github-search"
+      provider: "github-search",
+      contentType: "repository",
+      externalId: fullName,
+      language: repository.language ?? null,
+      engagement: { stars, updatedAt: repository.updated_at ?? null }
     });
     if (results.length >= maxResults) break;
   }

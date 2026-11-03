@@ -37,6 +37,13 @@ export interface NewsArticle {
   publishedAt: string | null;
   fetchedAt: string;
   contentExcerpt: string | null;
+  provider?: string;
+  contentType?: "article" | "repository" | "discussion" | "video" | "social_post" | "webpage";
+  author?: string | null;
+  bodyContent?: string | null;
+  imageUrl?: string | null;
+  language?: string | null;
+  engagement?: Record<string, number | string | boolean | null>;
 }
 
 export interface CollectionRun {
