@@ -15,3 +15,6 @@ OPENROUTER_MODEL=openrouter/free
 OPENROUTER_ALLOW_PAID=false
 OPENROUTER_SITE_URL=http://localhost:5173
 OPENROUTER_APP_TITLE=News for Me
+
+# Local-only development shortcut. Never configure this in production.
+ALLOW_DEV_AUTH=true
