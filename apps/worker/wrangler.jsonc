@@ -1,4 +1,4 @@
-{
+﻿{
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "news-for-me-api",
   "main": "src/index.ts",
@@ -20,7 +20,7 @@
     {
       "binding": "DB",
       "database_name": "news-for-me-db",
-      "database_id": "00000000-0000-4000-8000-000000000001",
+      "database_id": "1828de37-71bf-400c-a4fd-363cebbcd93f",
       "migrations_dir": "migrations"
     }
   ],
@@ -54,3 +54,4 @@
   },
   "workers_dev": false
 }
+
