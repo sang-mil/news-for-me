@@ -25,6 +25,13 @@ interface ArticleRow {
   published_at: string | null;
   fetched_at: string;
   content_excerpt: string | null;
+  provider: string;
+  content_type: NewsArticle["contentType"];
+  author: string | null;
+  body_content: string | null;
+  image_url: string | null;
+  language: string | null;
+  engagement_json: string;
 }
 
 function toCollectionRun(row: CollectionRunRow): CollectionRun {
@@ -91,7 +98,9 @@ export async function listTopicArticles(
 ): Promise<NewsArticle[]> {
   const result = await db.prepare(`
     SELECT a.id, a.title, a.canonical_url, a.source_name,
-      a.published_at, a.fetched_at, a.content_excerpt
+      a.published_at, a.fetched_at, a.content_excerpt, a.provider,
+      a.content_type, a.author, a.body_content, a.image_url, a.language,
+      a.engagement_json
     FROM articles a
     INNER JOIN topic_articles ta ON ta.article_id = a.id
     INNER JOIN topics t ON t.id = ta.topic_id
@@ -107,7 +116,14 @@ export async function listTopicArticles(
     sourceName: row.source_name,
     publishedAt: row.published_at,
     fetchedAt: row.fetched_at,
-    contentExcerpt: row.content_excerpt
+    contentExcerpt: row.content_excerpt,
+    provider: row.provider,
+    contentType: row.content_type,
+    author: row.author,
+    bodyContent: row.body_content,
+    imageUrl: row.image_url,
+    language: row.language,
+    engagement: JSON.parse(row.engagement_json) as Record<string, number | string | boolean | null>
   }));
 }
 
@@ -150,11 +166,16 @@ export async function storeCollectedArticles(
     statements.push(db.prepare(`
       INSERT OR IGNORE INTO articles (
         id, canonical_url, url_hash, title, source_name,
-        published_at, content_excerpt, language, metadata_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'ko', ?)
+        published_at, content_excerpt, language, metadata_json, provider,
+        content_type, author, body_content, image_url, engagement_json, external_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       articleId, normalizedUrl, urlHash, item.title, item.sourceName,
-      item.publishedAt, item.excerpt, JSON.stringify({ provider: item.provider })
+      item.publishedAt, item.excerpt, item.language ?? "ko",
+      JSON.stringify({ provider: item.provider, ...(item.metadata ?? {}) }),
+      item.provider, item.contentType ?? "article", item.author ?? null,
+      item.bodyContent ?? null, item.imageUrl ?? null,
+      JSON.stringify(item.engagement ?? {}), item.externalId ?? null
     ));
 
     statements.push(db.prepare(`
