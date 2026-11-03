@@ -1,7 +1,20 @@
-﻿.collection-status {
+.collection-status {
   margin-top: 11px;
   color: #68758b;
   font-size: 10px;
+}
+
+.collection-error {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-left: 3px solid #d97706;
+  border-radius: 4px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 .topic-actions-column {
   flex-direction: column;
