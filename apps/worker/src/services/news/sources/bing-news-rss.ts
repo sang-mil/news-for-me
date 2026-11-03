@@ -129,7 +129,12 @@ export async function searchBingNewsRss(
     throw new Error(`Bing News RSS XML parsing failed: ${detail.slice(0, 250)}`);
   }
 
-  const rawItems = parsed.rss?.channel?.item;
+  if (!parsed.rss?.channel) {
+    const rootKeys = Object.keys(parsed as Record<string, unknown>).slice(0, 8).join(", ") || "none";
+    throw new Error(`Bing News RSS XML had an unexpected structure; root elements: ${rootKeys}`);
+  }
+
+  const rawItems = parsed.rss.channel.item;
   if (!rawItems) return [];
 
   const excluded = input.excludeKeywords
