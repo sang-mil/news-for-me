@@ -1,5 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import type { CollectedNewsItem, NewsSearchInput } from "../types";
+import { matchesTopicRelevance } from "../relevance";
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -116,7 +117,7 @@ function resolveArticleUrl(rawLink: string): URL | null {
 async function fetchBingNewsQuery(
   query: string,
   queryVariant: BingAttemptDiagnostic["queryVariant"],
-  excludeKeywords: string[],
+  input: NewsSearchInput,
   maxResults: number
 ): Promise<{ items: CollectedNewsItem[]; diagnostic: BingAttemptDiagnostic }> {
   const url = new URL("https://www.bing.com/news/search");
@@ -180,7 +181,7 @@ async function fetchBingNewsQuery(
   const channelKeys = Object.keys(channel).slice(0, 12);
   const rawItems = channel.item;
   const rawList = rawItems ? (Array.isArray(rawItems) ? rawItems : [rawItems]) : [];
-  const excluded = excludeKeywords.map((keyword) => keyword.toLocaleLowerCase()).filter(Boolean);
+  const excluded = input.excludeKeywords.map((keyword) => keyword.toLocaleLowerCase()).filter(Boolean);
   const collected: CollectedNewsItem[] = [];
   let missingTitleCount = 0;
   let missingLinkCount = 0;
@@ -212,6 +213,7 @@ async function fetchBingNewsQuery(
       || articleUrl.hostname.replace(/^www\./i, "");
     const excerpt = cleanExcerpt(asText(item.description));
     const searchable = `${title} ${sourceName} ${excerpt ?? ""}`.toLocaleLowerCase();
+    if (!matchesTopicRelevance(input, searchable)) continue;
     if (excluded.some((keyword) => searchable.includes(keyword))) {
       excludedCount += 1;
       continue;
@@ -269,7 +271,7 @@ export async function searchBingNewsRss(
     const result = await fetchBingNewsQuery(
       queries[index],
       variants[index],
-      input.excludeKeywords,
+      input,
       maxResults
     );
     diagnostics.push(result.diagnostic);
