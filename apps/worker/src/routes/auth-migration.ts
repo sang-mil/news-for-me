@@ -8,7 +8,8 @@ interface MigrationEnvironment extends BetterAuthEnvironment {
 
 export async function handleAuthMigration(
   request: Request,
-  env: MigrationEnvironment
+  env: MigrationEnvironment,
+  allowedOrigin: string
 ): Promise<Response> {
   if (request.method !== "POST") {
     return new Response("Not Found", { status: 404 });
@@ -25,7 +26,7 @@ export async function handleAuthMigration(
       !env.GOOGLE_CLIENT_ID?.trim() ||
       !env.GOOGLE_CLIENT_SECRET?.trim() ||
       !env.AUTH_ALLOWED_EMAIL?.trim()) {
-    return jsonResponse({ error: "Google authentication configuration is incomplete." }, 503);
+    return jsonResponse({ error: "Google authentication configuration is incomplete." }, 503, allowedOrigin);
   }
 
   try {
@@ -40,12 +41,12 @@ export async function handleAuthMigration(
       pendingTables,
       pendingColumns,
       message: "Better Auth D1 schema is ready."
-    });
+    }, 200, allowedOrigin);
   } catch (error) {
     console.error("Better Auth migration failed:", error);
     return jsonResponse({
       error: "Better Auth database migration failed.",
       details: error instanceof Error ? [error.message.slice(0, 300)] : []
-    }, 500);
+    }, 500, allowedOrigin);
   }
 }
