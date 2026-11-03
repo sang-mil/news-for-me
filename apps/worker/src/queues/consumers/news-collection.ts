@@ -71,24 +71,25 @@ async function processCollectionJob(
 
   if (items.length === 0) {
     try {
-      const fallbackItems = await searchBingNewsRss(searchInput);
-      items = fallbackItems;
+      const bingResult = await searchBingNewsRss(searchInput);
+      items = bingResult.items;
 
       if (items.length > 0) {
-        collectionNote = `Google News RSS unavailable or empty (${googleFailure ?? "no details"}). Bing News RSS fallback collected ${items.length} articles.`;
+        collectionNote = `Google News RSS unavailable or empty (${googleFailure ?? "no details"}). Bing News RSS fallback collected ${items.length} articles. Search diagnostics: ${JSON.stringify(bingResult.diagnostics)}`;
         console.info("[NewsForMe][RSS] Bing News RSS fallback succeeded", {
           runId: job.runId,
           topicId: job.topicId,
           articlesFound: items.length,
-          primaryError: googleFailure
+          primaryError: googleFailure,
+          bingDiagnostics: bingResult.diagnostics
         });
       } else {
-        collectionNote = `Google News RSS unavailable or empty (${googleFailure ?? "no details"}). Bing News RSS responded successfully but returned 0 matching articles.`;
+        collectionNote = `Google News RSS unavailable or empty (${googleFailure ?? "no details"}). Bing News RSS returned 0 usable articles. Search diagnostics: ${JSON.stringify(bingResult.diagnostics)}`;
         console.warn("[NewsForMe][RSS] both sources returned no usable articles", {
           runId: job.runId,
           topicId: job.topicId,
           primaryError: googleFailure,
-          fallbackArticlesFound: 0
+          bingDiagnostics: bingResult.diagnostics
         });
       }
     } catch (error) {
