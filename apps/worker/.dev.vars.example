@@ -1,4 +1,9 @@
 ﻿# Add the real values to apps/worker/.dev.vars, not to this example file.
+# Local-only identity (keep your current user ID to preserve local data).
+DEV_USER_ID=your-existing-local-user-id
+DEV_USER_EMAIL=your-local-email
+ALLOW_DEV_AUTH=true
+ALLOWED_ORIGIN=http://127.0.0.1:5173,http://localhost:5173
 GEMINI_API_KEY_1=your-gemini-api-key-1
 GEMINI_API_KEY_2=your-gemini-api-key-2
 
@@ -15,3 +20,19 @@ OPENROUTER_MODEL=openrouter/free
 OPENROUTER_ALLOW_PAID=false
 OPENROUTER_SITE_URL=http://localhost:5173
 OPENROUTER_APP_TITLE=News for Me
+
+# Google OAuth: use the same Google OAuth client for the app sign-in and Gmail sender.
+GOOGLE_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
+
+# Better Auth session and single-owner account restriction.
+BETTER_AUTH_SECRET=replace-with-a-long-random-secret
+BETTER_AUTH_URL=http://127.0.0.1:8787
+AUTH_ALLOWED_EMAIL=your-google-login-email
+# Preserve the current News for Me data owner on first Google login.
+LEGACY_USER_ID=your-existing-DEV_USER_ID
+
+# Gmail API sending (keep the sender equal to AUTH_ALLOWED_EMAIL).
+GOOGLE_REFRESH_TOKEN=your-gmail-refresh-token
+GMAIL_SENDER=your-google-login-email
+

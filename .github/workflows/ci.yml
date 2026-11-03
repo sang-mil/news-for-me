@@ -7,6 +7,7 @@ on:
     branches:
       - main
       - "design/**"
+      - "feat/**"
 
 permissions:
   contents: read
@@ -30,7 +31,8 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # Run npm install until the Better Auth workspace dependency is locked locally.
+        run: npm install
 
       - name: Typecheck web
         run: npm run typecheck:web

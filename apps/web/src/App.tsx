@@ -4,13 +4,15 @@ import type {
   SavedNewsTag, Topic, TopicInput
 } from "@news-for-me/shared";
 import {
-  collectTopic, createTopic, deleteTopic, getApiHealth, getCollectionRun,
+  collectTopic, createTopic, deleteTopic, getApiHealth, getCollectionRun, getCurrentUser,
   listTopicArticles, listScraps, listTags, listTopics, updateTopic,
   saveArticle, unsaveArticle, updateScrapNote, replaceScrapTags,
   createTag, deleteTag, updateTag
 } from "./lib/api";
+import { signInWithGoogle, signOutFromNewsForMe } from "./lib/auth-client";
 
 type ApiStatus = "checking" | "online" | "offline";
+type AuthStatus = "checking" | "signed-in" | "signed-out" | "unavailable";
 interface TopicFormState {
   name: string;
   description: string;
@@ -45,6 +47,9 @@ function wait(milliseconds: number): Promise<void> {
 export default function App() {
   const [status, setStatus] = useState<ApiStatus>("checking");
   const [health, setHealth] = useState<ApiHealthResponse | null>(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
+  const [authUser, setAuthUser] = useState<{ id: string; email: string; name: string; isDevelopment: boolean } | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [articlesByTopic, setArticlesByTopic] = useState<Record<string, NewsArticle[]>>({});
   const [scraps, setScraps] = useState<SavedNewsArticle[]>([]);
@@ -70,6 +75,21 @@ export default function App() {
     setIsLoading(true);
     setError("");
     try {
+      const identity = await getCurrentUser();
+      if (!identity.authenticated || !identity.user) {
+        setAuthUser(null);
+        setAuthStatus("signed-out");
+        setStatus("online");
+        setHealth(null);
+        setTopics([]);
+        setScraps([]);
+        setTags([]);
+        return;
+      }
+
+      setAuthUser({ ...identity.user, isDevelopment: identity.isDevelopment });
+      setAuthStatus("signed-in");
+
       const [apiHealth, topicList, savedArticles, userTags] = await Promise.all([
         getApiHealth(), listTopics(), listScraps(), listTags()
       ]);
@@ -79,6 +99,7 @@ export default function App() {
       setScraps(savedArticles);
       setTags(userTags);
     } catch (err) {
+      setAuthStatus("unavailable");
       setStatus("offline");
       setHealth(null);
       setError(err instanceof Error ? err.message : "데이터를 불러오지 못했습니다.");
@@ -88,6 +109,27 @@ export default function App() {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  async function handleGoogleSignIn() {
+    setIsSigningIn(true);
+    setError("");
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google 로그인에 실패했습니다.");
+      setIsSigningIn(false);
+    }
+  }
+
+  async function handleSignOut() {
+    setError("");
+    try {
+      await signOutFromNewsForMe();
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "로그아웃에 실패했습니다.");
+    }
+  }
 
   function resetForm() {
     setForm(EMPTY_FORM);
@@ -284,6 +326,42 @@ export default function App() {
     });
   }, [scraps, archiveQuery, archiveTagFilter]);
 
+  if (authStatus !== "signed-in") {
+    return (
+      <main className="auth-shell">
+        <section className="auth-card" aria-labelledby="auth-title">
+          <a className="auth-brand" href="/" aria-label="News for Me 홈">
+            <span className="auth-brand-mark">n.</span>
+            <span>News for Me</span>
+          </a>
+          <div className="auth-eyebrow">YOUR PERSONAL NEWSROOM</div>
+          <h1 id="auth-title">나만의 뉴스룸에<br /><span>로그인하세요.</span></h1>
+          <p>Google 계정으로 로그인하면 관심 주제와 스크랩, 개인 메모를 안전하게 불러옵니다.</p>
+          {authStatus === "checking" && (
+            <p className="auth-loading" role="status">로그인 상태를 확인하고 있습니다.</p>
+          )}
+          {authStatus === "unavailable" && (
+            <div className="auth-error" role="alert">
+              연결 또는 인증 설정을 확인할 수 없습니다. 다시 시도하거나 관리자 설정을 확인하세요.
+            </div>
+          )}
+          {error && <div className="auth-error" role="alert">{error}</div>}
+          {(authStatus === "signed-out" || authStatus === "unavailable") && (
+            <button className="google-signin-button" type="button" onClick={() => void handleGoogleSignIn()} disabled={isSigningIn}>
+              <span className="google-g" aria-hidden="true">G</span>
+              {isSigningIn ? "Google로 이동 중…" : "Google 계정으로 계속하기"}
+              <span className="google-arrow" aria-hidden="true">↗</span>
+            </button>
+          )}
+          {authStatus === "unavailable" && (
+            <button className="auth-retry-button" type="button" onClick={() => void refresh()}>다시 연결 확인</button>
+          )}
+          <div className="auth-footnote">로그인한 계정에 연결된 뉴스와 보관함만 표시됩니다.</div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="page-shell">
       <header className="topbar">
@@ -296,6 +374,12 @@ export default function App() {
           <a href="#topics">관심 주제</a>
           <a className="top-nav-cta" href="#topic-form">주제 추가 <span aria-hidden="true">↗</span></a>
         </nav>
+        {authUser && !authUser.isDevelopment && (
+          <div className="account-control">
+            <span className="account-email" title={authUser.email}>{authUser.email}</span>
+            <button type="button" className="sign-out-button" onClick={() => void handleSignOut()}>로그아웃</button>
+          </div>
+        )}
         <div className={`connection-status ${status}`} aria-live="polite">
           <span className="status-light" />
           {status === "checking" ? "연결 확인 중" : status === "online" ? "API 연결됨" : "연결 확인 필요"}

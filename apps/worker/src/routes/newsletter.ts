@@ -12,7 +12,6 @@ import type { GmailEnvironment } from "../services/email/types";
 
 interface NewsletterEnv extends GmailEnvironment {
   DB: D1Database;
-  DEV_USER_EMAIL?: string;
 }
 
 const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
@@ -26,6 +25,7 @@ export async function handleNewsletterRequest(
   request: Request,
   env: NewsletterEnv,
   userId: string,
+  authenticatedEmail: string,
   allowedOrigin: string
 ): Promise<Response> {
   const url = new URL(request.url);
@@ -44,17 +44,17 @@ export async function handleNewsletterRequest(
       return jsonResponse({ error: "테스트 발송 확인값이 필요합니다." }, 400, allowedOrigin);
     }
 
-    const recipient = env.DEV_USER_EMAIL?.trim().toLowerCase() ?? "";
+    const recipient = authenticatedEmail.trim().toLowerCase();
     const sender = env.GMAIL_SENDER?.trim().toLowerCase() ?? "";
     if (!recipient || !EMAIL_RE.test(recipient)) {
-      return jsonResponse({ error: "DEV_USER_EMAIL에 본인 이메일 주소를 설정하세요." }, 503, allowedOrigin);
+      return jsonResponse({ error: "Google 계정 이메일을 확인할 수 없습니다." }, 503, allowedOrigin);
     }
     if (!sender || !EMAIL_RE.test(sender)) {
       return jsonResponse({ error: "GMAIL_SENDER에 Gmail 발신 주소를 설정하세요." }, 503, allowedOrigin);
     }
-    // First integration stage deliberately sends only to the configured developer's own mailbox.
+    // Test delivery is restricted to the signed-in owner account that matches the configured sender.
     if (recipient !== sender) {
-      return jsonResponse({ error: "안전한 테스트를 위해 DEV_USER_EMAIL과 GMAIL_SENDER를 동일한 본인 이메일 주소로 설정해야 합니다." }, 409, allowedOrigin);
+      return jsonResponse({ error: "안전한 테스트 발송을 위해 로그인 계정과 GMAIL_SENDER가 동일해야 합니다." }, 403, allowedOrigin);
     }
     if (!env.GOOGLE_CLIENT_ID?.trim() || !env.GOOGLE_CLIENT_SECRET?.trim() || !env.GOOGLE_REFRESH_TOKEN?.trim()) {
       return jsonResponse({ error: "Google OAuth 설정이 부족합니다. GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN을 확인하세요." }, 503, allowedOrigin);
