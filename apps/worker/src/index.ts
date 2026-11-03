@@ -6,6 +6,7 @@ import { handleNewsletterRequest } from "./routes/newsletter";
 import type { GmailEnvironment } from "./services/email/types";
 import { createAuth, isBetterAuthConfigured } from "./services/auth/better-auth";
 import { resolveAppIdentity } from "./lib/authentication";
+import { handleAuthMigration } from "./routes/auth-migration";
 import { cleanupUnScrapedNews } from "./services/maintenance/article-cleanup";
 import { ensureDevelopmentUser } from "./lib/dev-user";
 import { jsonResponse } from "./lib/http";
@@ -24,6 +25,9 @@ interface Env extends AIEnvironment, GmailEnvironment {
   BETTER_AUTH_URL?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  AUTH_ALLOWED_EMAIL?: string;
+  LEGACY_USER_ID?: string;
+  AUTH_MIGRATION_TOKEN?: string;
 }
 
 export default {
@@ -58,6 +62,10 @@ export default {
     }
 
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/_internal/auth-migrate") {
+      return handleAuthMigration(request, env);
+    }
 
     if (url.pathname.startsWith("/api/auth/")) {
       if (!isBetterAuthConfigured(env)) {
