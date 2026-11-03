@@ -1,4 +1,5 @@
 import type { CollectedNewsItem, NewsSearchInput, NewsSource } from "../types";
+import { matchesTopicRelevance } from "../relevance";
 
 interface YouTubeSearchItem {
   id?: { kind?: string; videoId?: string };
@@ -46,7 +47,7 @@ export function createYouTubeVideosSource(apiKey: string): NewsSource {
       url.searchParams.set("type", "video");
       url.searchParams.set("q", query);
       url.searchParams.set("maxResults", String(Math.min(30, Math.max(1, input.maxResults ?? 10))));
-      url.searchParams.set("order", "date");
+      url.searchParams.set("order", "relevance");
       url.searchParams.set("regionCode", "KR");
       url.searchParams.set("relevanceLanguage", "ko");
       url.searchParams.set("safeSearch", "moderate");
@@ -71,6 +72,7 @@ export function createYouTubeVideosSource(apiKey: string): NewsSource {
         const description = snippet?.description?.trim() ?? "";
         const channelTitle = snippet?.channelTitle?.trim() ?? "YouTube";
         const searchable = (title + " " + description + " " + channelTitle).toLocaleLowerCase();
+        if (!matchesTopicRelevance(input, searchable)) continue;
         if (excluded.some((term) => searchable.includes(term))) continue;
         const timestamp = snippet?.publishedAt ? Date.parse(snippet.publishedAt) : Number.NaN;
         results.push({
