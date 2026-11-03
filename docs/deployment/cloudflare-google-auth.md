@@ -116,7 +116,9 @@ npx wrangler secret put LEGACY_USER_ID
 npx wrangler secret put AUTH_MIGRATION_TOKEN
 npx wrangler secret put GEMINI_API_KEY_1
 npx wrangler secret put GEMINI_API_KEY_2
+npx wrangler secret put OPENROUTER_API_KEY
 npx wrangler secret put GOOGLE_REFRESH_TOKEN
+npx wrangler secret put GMAIL_SENDER
 ~~~
 
 BETTER_AUTH_SECRET과 AUTH_MIGRATION_TOKEN은 각각 별도의 강한 랜덤 값이어야 합니다. GOOGLE_CLIENT_ID/SECRET은 위에서 지정한 OAuth Client와 일치해야 합니다.
@@ -125,7 +127,9 @@ AUTH_ALLOWED_EMAIL은 로그인할 Google 계정 이메일입니다. GMAIL_SENDE
 
 LEGACY_USER_ID는 데이터를 이전한 경우 기존 운영 D1의 users.id입니다. 값이 틀리면 첫 로그인 데이터 연결이 실패합니다.
 
-기존 뉴스 요약 설정에서 OpenRouter를 계속 쓴다면 OPENROUTER_API_KEY도 Secret으로 등록하세요.
+OpenRouter를 사용하지 않는다면 OPENROUTER_API_KEY 등록은 생략할 수 있습니다. GMAIL_SENDER는 로그인 허용 주소(AUTH_ALLOWED_EMAIL)와 동일하게 설정합니다.
+
+GEMINI_PROJECT_SLOT_1과 GEMINI_PROJECT_SLOT_2는 Secret이 아닌 일반 변수로 등록하세요. 두 Gemini 키가 같은 Google Cloud 프로젝트에서 발급됐다면 같은 슬롯 이름을 쓰고, 서로 다른 프로젝트라면 각 프로젝트를 구분하는 고유한 라벨을 사용합니다. 로컬 .dev.vars.example의 google-project-a/b는 예시 문자열일 뿐 실제 프로젝트 구성을 반영하지 않습니다.
 
 일반 변수 BETTER_AUTH_URL과 ALLOWED_ORIGIN은 Worker Wrangler 설정에 들어 있습니다.
 
