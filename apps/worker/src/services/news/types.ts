@@ -25,6 +25,7 @@ export interface NewsSearchInput {
   topicName: string;
   includeKeywords: string[];
   excludeKeywords: string[];
+  maxResults?: number;
 }
 
 export interface NewsSource {
@@ -36,4 +37,5 @@ export interface CollectionJobMessage {
   runId: string;
   topicId: string;
   userId: string;
+  maxArticles?: number;
 }
