@@ -19,7 +19,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("Accept", "application/json");
   if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+    credentials: "same-origin"
+  });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const errorPayload = payload as ErrorPayload | null;
@@ -27,6 +31,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error([errorPayload?.error ?? `Request failed (${response.status})`, detail].filter(Boolean).join(" "));
   }
   return payload as T;
+}
+
+export interface CurrentUserResponse {
+  authenticated: boolean;
+  isDevelopment: boolean;
+  user: { id: string; email: string; name: string } | null;
+}
+
+export async function getCurrentUser(): Promise<CurrentUserResponse> {
+  return request<CurrentUserResponse>("/api/me");
 }
 
 export async function getApiHealth(): Promise<ApiHealthResponse> {
