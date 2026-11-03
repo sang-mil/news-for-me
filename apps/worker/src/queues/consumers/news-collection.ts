@@ -6,6 +6,7 @@ import {
   storeCollectedArticles
 } from "../../db/repositories/news";
 import { googleNewsRssSource } from "../../services/news/sources/google-news-rss";
+import { searchBingNewsRss } from "../../services/news/sources/bing-news-rss";
 import { summarizeCollectedArticles } from "../../services/ai/summarizer";
 import type { AIEnvironment } from "../../services/ai/types";
 import type { CollectionJobMessage } from "../../services/news/types";
@@ -34,13 +35,77 @@ async function processCollectionJob(
   const topic = await getTopicForCollection(env.DB, job.userId, job.topicId);
   if (!topic) throw new Error("Topic no longer exists or is inactive.");
 
-  const items = await googleNewsRssSource.search({
+  const searchInput = {
     topicName: topic.name,
     includeKeywords: parseKeywords(topic.include_keywords_json),
     excludeKeywords: parseKeywords(topic.exclude_keywords_json)
-  });
+  };
 
-  const storedArticles = await storeCollectedArticles(env.DB, job, items);
+  let items: Awaited<ReturnType<typeof googleNewsRssSource.search>> = [];
+  let googleFailure: string | null = null;
+  let collectionNote: string | null = null;
+
+  try {
+    items = await googleNewsRssSource.search(searchInput);
+    if (items.length === 0) {
+      googleFailure = "Google News RSS responded successfully but returned 0 matching articles.";
+      console.warn("[NewsForMe][RSS] Google News RSS returned 0 articles; trying Bing fallback", {
+        runId: job.runId,
+        topicId: job.topicId
+      });
+    } else {
+      console.info("[NewsForMe][RSS] Google News RSS succeeded", {
+        runId: job.runId,
+        topicId: job.topicId,
+        articlesFound: items.length
+      });
+    }
+  } catch (error) {
+    googleFailure = error instanceof Error ? error.message : String(error);
+    console.warn("[NewsForMe][RSS] Google News RSS failed; trying Bing fallback", {
+      runId: job.runId,
+      topicId: job.topicId,
+      error: googleFailure
+    });
+  }
+
+  if (items.length === 0) {
+    try {
+      const fallbackItems = await searchBingNewsRss(searchInput);
+      items = fallbackItems;
+
+      if (items.length > 0) {
+        collectionNote = `Google News RSS unavailable or empty (${googleFailure ?? "no details"}). Bing News RSS fallback collected ${items.length} articles.`;
+        console.info("[NewsForMe][RSS] Bing News RSS fallback succeeded", {
+          runId: job.runId,
+          topicId: job.topicId,
+          articlesFound: items.length,
+          primaryError: googleFailure
+        });
+      } else {
+        collectionNote = `Google News RSS unavailable or empty (${googleFailure ?? "no details"}). Bing News RSS responded successfully but returned 0 matching articles.`;
+        console.warn("[NewsForMe][RSS] both sources returned no usable articles", {
+          runId: job.runId,
+          topicId: job.topicId,
+          primaryError: googleFailure,
+          fallbackArticlesFound: 0
+        });
+      }
+    } catch (error) {
+      const fallbackFailure = error instanceof Error ? error.message : String(error);
+      console.error("[NewsForMe][RSS] all RSS sources failed", {
+        runId: job.runId,
+        topicId: job.topicId,
+        googleError: googleFailure,
+        bingError: fallbackFailure
+      });
+      throw new Error(
+        `All news RSS sources failed. Google News RSS: ${googleFailure ?? "no usable articles"}; Bing News RSS: ${fallbackFailure}`
+      );
+    }
+  }
+
+  const storedArticles = await storeCollectedArticles(env.DB, job, items, collectionNote);
   const result = await summarizeCollectedArticles(
     env.DB, job.runId, job.topicId, storedArticles, env
   );
