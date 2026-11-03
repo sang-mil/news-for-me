@@ -55,6 +55,7 @@ For production YouTube collection, add the key as a Worker secret:
 
 ~~~powershell
 npx wrangler secret put YOUTUBE_API_KEY --config .\apps\worker\wrangler.jsonc
+npx wrangler secret put X_BEARER_TOKEN --config .\apps\worker\wrangler.jsonc
 ~~~
 
 ## Security notes
