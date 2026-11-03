@@ -2,6 +2,8 @@
 import { handleTopicsRequest } from "./routes/topics";
 import { handleCollectionRequest } from "./routes/collection";
 import { handleScrapsRequest } from "./routes/scraps";
+import { handleNewsletterRequest } from "./routes/newsletter";
+import type { GmailEnvironment } from "./services/email/types";
 import { cleanupUnScrapedNews } from "./services/maintenance/article-cleanup";
 import { ensureDevelopmentUser } from "./lib/dev-user";
 import { jsonResponse } from "./lib/http";
@@ -9,7 +11,7 @@ import { handleNewsCollectionQueue } from "./queues/consumers/news-collection";
 import type { AIEnvironment } from "./services/ai/types";
 import type { CollectionJobMessage } from "./services/news/types";
 
-interface Env extends AIEnvironment {
+interface Env extends AIEnvironment, GmailEnvironment {
   DB: D1Database;
   NEWS_QUEUE: Queue<CollectionJobMessage>;
   ALLOWED_ORIGIN?: string;
@@ -75,6 +77,28 @@ export default {
       }
     }
 
+    const isNewsletterApi =
+      url.pathname === "/api/newsletter/preview" ||
+      url.pathname === "/api/newsletter/send-test";
+
+    if (isNewsletterApi) {
+      let userId: string | null;
+      try {
+        userId = await ensureDevelopmentUser(env.DB, env);
+      } catch {
+        return jsonResponse({ error: "Could not initialize the local development user." }, 503, allowedOrigin);
+      }
+      if (!userId) {
+        return jsonResponse({ error: "Local development user is not configured. Set DEV_USER_ID and DEV_USER_EMAIL in apps/worker/.dev.vars." }, 503, allowedOrigin);
+      }
+      try {
+        return await handleNewsletterRequest(request, env, userId, allowedOrigin);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "Unknown newsletter error";
+        console.error("Newsletter API error:", detail);
+        return jsonResponse({ error: "뉴스레터 처리 중 오류가 발생했습니다." }, 500, allowedOrigin);
+      }
+    }
     const isScrapsApi =
       url.pathname === "/api/scraps" ||
       url.pathname.startsWith("/api/scraps/") ||
@@ -154,3 +178,4 @@ export default {
     console.log("Weekly unsaved-news cleanup completed", result);
   }
 };
+
