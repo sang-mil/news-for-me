@@ -41,6 +41,8 @@ https://news-for-me.pages.dev/api/auth/callback/google
 
 현재 Gmail 발송에 쓰는 Google OAuth Client ID/Secret을 로그인에도 재사용합니다. Better Auth 로그인은 기본 Google 프로필 권한만 사용하고, Gmail Refresh Token은 테스트 메일 발송용으로 별도 유지합니다.
 
+OAuth 동의 화면이 아직 Testing이라면 Google Auth Platform의 Test users에 AUTH_ALLOWED_EMAIL 계정을 추가하세요. 이 상태에서 gmail.send 권한으로 발급한 Gmail Refresh Token은 7일 후 만료될 수 있습니다. 이는 Google 로그인 세션과 별개의 문제이며, 정기 뉴스레터 발송을 운영하려면 브랜딩·게시 및 필요한 Google 검증을 마친 뒤 Gmail Refresh Token을 새로 발급해야 합니다.
+
 ## 2. Cloudflare 리소스 생성
 
 PowerShell에서 저장소 루트로 이동합니다.
