@@ -242,7 +242,6 @@ async function fetchBingNewsQuery(
   };
 
   console.info("[NewsForMe][RSS] Bing News RSS response parsed", {
-    queryVariant,
     httpStatus: response.status,
     contentType,
     responseBytes: new TextEncoder().encode(xml).length,
