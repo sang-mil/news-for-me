@@ -21,8 +21,8 @@ function asText(value: unknown): string {
 
 function cleanExcerpt(value: string): string | null {
   const cleaned = value
-    .replace(/<script[\\s\\S]*?<\\/script>/gi, " ")
-    .replace(/<style[\\s\\S]*?<\\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&#39;/g, "'")
@@ -30,16 +30,16 @@ function cleanExcerpt(value: string): string | null {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
   return cleaned ? cleaned.slice(0, 2000) : null;
 }
 
 function safeTerm(value: string): string {
   return value
-    .replace(/["\\\\]/g, " ")
-    .replace(/[\\r\\n]+/g, " ")
-    .replace(/\\s+/g, " ")
+    .replace(/["\\]/g, " ")
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -104,7 +104,7 @@ export async function searchBingNewsRss(
     const retryAfter = response.headers.get("retry-after") ?? "not provided";
     let bodyPreview = "";
     try {
-      bodyPreview = (await response.text()).replace(/\\s+/g, " ").trim().slice(0, 300);
+      bodyPreview = (await response.text()).replace(/\s+/g, " ").trim().slice(0, 300);
     } catch {
       bodyPreview = "response body could not be read";
     }
@@ -146,7 +146,7 @@ export async function searchBingNewsRss(
     const articleUrl = resolveArticleUrl(rawLink);
     if (!title || !articleUrl) continue;
 
-    const sourceName = asText(item.source) || articleUrl.hostname.replace(/^www\\./i, "");
+    const sourceName = asText(item.source) || articleUrl.hostname.replace(/^www\./i, "");
     const excerpt = cleanExcerpt(asText(item.description));
     const searchable = `${title} ${sourceName} ${excerpt ?? ""}`.toLocaleLowerCase();
     if (excluded.some((keyword) => searchable.includes(keyword.toLocaleLowerCase()))) continue;
