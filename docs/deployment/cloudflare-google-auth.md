@@ -149,24 +149,7 @@ npx wrangler deploy
 
 Worker 설정의 workers_dev: false는 Worker의 공개 workers.dev 주소를 비활성화합니다. Pages Service Binding을 통해서만 호출하게 하기 위한 설정입니다.
 
-## 6. Better Auth D1 테이블 생성
-
-Worker와 Pages가 배포된 후 Pages 도메인으로 보호된 일회성 마이그레이션 endpoint를 호출합니다.
-
-AUTH_MIGRATION_TOKEN에 등록한 값을 PowerShell 변수에 넣고 실행합니다.
-
-~~~powershell
-$token = Read-Host "AUTH_MIGRATION_TOKEN"
-
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "https://news-for-me.pages.dev/api/_internal/auth-migrate" `
-  -Headers @{ Authorization = "Bearer $token" }
-~~~
-
-성공하면 Better Auth D1 schema is ready.가 반환됩니다. 이 endpoint는 강한 토큰이 없으면 404를 반환합니다. 마이그레이션이 끝난 다음 Cloudflare에서 AUTH_MIGRATION_TOKEN Secret을 삭제하거나 교체하는 것을 권장합니다.
-
-## 7. Pages 배포
+## 6. Pages 배포
 
 저장소 루트에서 의존성을 설치하고 빌드합니다.
 
@@ -192,6 +175,23 @@ npx wrangler pages deploy .\dist --project-name news-for-me
 ~~~
 
 Pages Wrangler 설정에는 NEWS_API Service Binding이 선언되어 있습니다. 이 binding이 news-for-me-api Worker를 가리키므로 /api/* 요청이 같은 도메인으로 전달됩니다. Dashboard를 사용할 경우 Pages 프로젝트 > Settings > Bindings > Service binding에서 변수명 NEWS_API, Worker news-for-me-api를 설정하고 재배포해야 합니다.
+
+## 7. Better Auth D1 테이블 생성
+
+Worker와 Pages가 배포된 후 Pages 도메인으로 보호된 일회성 마이그레이션 endpoint를 호출합니다.
+
+AUTH_MIGRATION_TOKEN에 등록한 값을 PowerShell 변수에 넣고 실행합니다.
+
+~~~powershell
+$token = Read-Host "AUTH_MIGRATION_TOKEN"
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "https://news-for-me.pages.dev/api/_internal/auth-migrate" `
+  -Headers @{ Authorization = "Bearer $token" }
+~~~
+
+성공하면 Better Auth D1 schema is ready.가 반환됩니다. 이 endpoint는 강한 토큰이 없으면 404를 반환합니다. 마이그레이션이 끝난 다음 Cloudflare에서 AUTH_MIGRATION_TOKEN Secret을 삭제하거나 교체하는 것을 권장합니다.
 
 ## 8. Google 로그인을 위한 마지막 확인
 
