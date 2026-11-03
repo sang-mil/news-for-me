@@ -34,7 +34,11 @@ npm install
 
 Copy `apps/worker/.dev.vars.example` to `apps/worker/.dev.vars`, then fill in the local developer ID/email and API credentials. Keep `ALLOW_DEV_AUTH=true` only in the local `.dev.vars` file.
 
-YouTube collection is optional. Enable YouTube Data API v3 in a Google Cloud project, create an API key, and add `YOUTUBE_API_KEY` to `apps/worker/.dev.vars`. Restrict the key to the YouTube Data API v3 and keep it out of source control. Without this key, other collection sources continue to work normally.\n\nX post collection is also optional. Add an X API Bearer Token as `X_BEARER_TOKEN` to `apps/worker/.dev.vars` or a Cloudflare Worker secret. X uses pay-per-usage billing and post reads are currently listed at USD 0.005 per returned post; a recent-search call requires at least 10 results, so control usage and set a spending limit in the X Developer Console. Without the token, X is shown as skipped in collection diagnostics.\n\nGitHub and V2EX are only queried for software/developer/technology topics to avoid filling unrelated topics (for example, sports) with repository links. All active sources also pass a topic/include-keyword relevance check before their results are stored.
+YouTube collection is optional. Enable YouTube Data API v3 in a Google Cloud project, create an API key, and add `YOUTUBE_API_KEY` to `apps/worker/.dev.vars`. Restrict the key to the YouTube Data API v3 and keep it out of source control. Without this key, other collection sources continue to work normally.
+
+X post collection is also optional. Add an X API Bearer Token as `X_BEARER_TOKEN` to `apps/worker/.dev.vars` or a Cloudflare Worker secret. X uses pay-per-usage billing and post reads are currently listed at USD 0.005 per returned post; a recent-search call requires at least 10 results, so control usage and set a spending limit in the X Developer Console. Without the token, X is shown as skipped in collection diagnostics.
+
+GitHub and V2EX are only queried for software/developer/technology topics to avoid filling unrelated topics (for example, sports) with repository links. All active sources also pass a topic/include-keyword relevance check before their results are stored.
 
 ~~~powershell
 npm run typecheck:web
