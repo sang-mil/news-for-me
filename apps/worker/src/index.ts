@@ -4,6 +4,8 @@ import { handleCollectionRequest } from "./routes/collection";
 import { handleScrapsRequest } from "./routes/scraps";
 import { handleNewsletterRequest } from "./routes/newsletter";
 import type { GmailEnvironment } from "./services/email/types";
+import { createAuth, isBetterAuthConfigured } from "./services/auth/better-auth";
+import { resolveAppIdentity } from "./lib/authentication";
 import { cleanupUnScrapedNews } from "./services/maintenance/article-cleanup";
 import { ensureDevelopmentUser } from "./lib/dev-user";
 import { jsonResponse } from "./lib/http";
@@ -17,6 +19,11 @@ interface Env extends AIEnvironment, GmailEnvironment {
   ALLOWED_ORIGIN?: string;
   DEV_USER_ID?: string;
   DEV_USER_EMAIL?: string;
+  ALLOW_DEV_AUTH?: string;
+  BETTER_AUTH_SECRET?: string;
+  BETTER_AUTH_URL?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
 }
 
 export default {
@@ -52,6 +59,17 @@ export default {
 
     const url = new URL(request.url);
 
+    if (url.pathname.startsWith("/api/auth/")) {
+      if (!isBetterAuthConfigured(env)) {
+        return jsonResponse(
+          { error: "Google 로그인 설정이 필요합니다. BETTER_AUTH_SECRET, BETTER_AUTH_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET을 확인하세요." },
+          503,
+          allowedOrigin
+        );
+      }
+      return createAuth(env).handler(request);
+    }
+
     if (url.pathname === "/api/health" && request.method === "GET") {
       try {
         const result = await env.DB.prepare("SELECT 1 AS ok").first<{ ok: number }>();
@@ -77,82 +95,94 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/me" && request.method === "GET") {
+      try {
+        const identity = await resolveAppIdentity(request, env);
+        return jsonResponse(
+          identity
+            ? {
+                authenticated: true,
+                isDevelopment: identity.isDevelopment,
+                user: { id: identity.userId, email: identity.email, name: identity.name }
+              }
+            : { authenticated: false, isDevelopment: false, user: null },
+          200,
+          allowedOrigin
+        );
+      } catch (error) {
+        console.error("Identity resolution failed:", error);
+        return jsonResponse({ error: "로그인 상태를 확인하지 못했습니다." }, 500, allowedOrigin);
+      }
+    }
+
     const isNewsletterApi =
       url.pathname === "/api/newsletter/preview" ||
       url.pathname === "/api/newsletter/send-test";
 
-    if (isNewsletterApi) {
-      let userId: string | null;
-      try {
-        userId = await ensureDevelopmentUser(env.DB, env);
-      } catch {
-        return jsonResponse({ error: "Could not initialize the local development user." }, 503, allowedOrigin);
-      }
-      if (!userId) {
-        return jsonResponse({ error: "Local development user is not configured. Set DEV_USER_ID and DEV_USER_EMAIL in apps/worker/.dev.vars." }, 503, allowedOrigin);
-      }
-      try {
-        return await handleNewsletterRequest(request, env, userId, allowedOrigin);
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : "Unknown newsletter error";
-        console.error("Newsletter API error:", detail);
-        return jsonResponse({ error: "뉴스레터 처리 중 오류가 발생했습니다." }, 500, allowedOrigin);
-      }
-    }
     const isScrapsApi =
       url.pathname === "/api/scraps" ||
       url.pathname.startsWith("/api/scraps/") ||
       url.pathname === "/api/tags" ||
       url.pathname.startsWith("/api/tags/") ||
-      /^\/api\/topics\/[^/]+\/articles\/[^/]+\/scrap$/.test(url.pathname);
+      /^\\/api\\/topics\\/[^/]+\\/articles\\/[^/]+\\/scrap$/.test(url.pathname);
 
-    if (isScrapsApi) {
-      let userId: string | null;
+    const isTopicsApi =
+      url.pathname === "/api/topics" ||
+      url.pathname.startsWith("/api/topics/");
+
+    if (isNewsletterApi || isScrapsApi || isTopicsApi) {
+      let identity;
       try {
-        userId = await ensureDevelopmentUser(env.DB, env);
-      } catch {
-        return jsonResponse({ error: "Could not initialize the local development user." }, 503, allowedOrigin);
-      }
-
-      if (!userId) {
-        return jsonResponse(
-          { error: "Authentication is not configured. Set DEV_USER_ID and DEV_USER_EMAIL in apps/worker/.dev.vars for local development." },
-          503,
-          allowedOrigin
-        );
-      }
-
-      try {
-        return await handleScrapsRequest(request, env.DB, userId, allowedOrigin);
+        identity = await resolveAppIdentity(request, env);
       } catch (error) {
-        console.error("Scraps API error:", error);
-        return jsonResponse({ error: "An internal error occurred while processing saved news." }, 500, allowedOrigin);
-      }
-    }
-
-    if (url.pathname === "/api/topics" || url.pathname.startsWith("/api/topics/")) {
-      let userId: string | null;
-      try {
-        userId = await ensureDevelopmentUser(env.DB, env);
-      } catch {
-        return jsonResponse({ error: "Could not initialize the local development user." }, 503, allowedOrigin);
+        console.error("Authentication lookup failed:", error);
+        return jsonResponse({ error: "인증 정보를 확인하지 못했습니다. 로그인 상태를 새로고침해 주세요." }, 503, allowedOrigin);
       }
 
-      if (!userId) {
+      if (!identity) {
         return jsonResponse(
-          {
-            error: "Authentication is not configured. Set DEV_USER_ID and DEV_USER_EMAIL in apps/worker/.dev.vars for local development. Production authentication must be implemented before public deployment."
-          },
-          503,
+          { error: "로그인이 필요합니다.", code: "AUTH_REQUIRED" },
+          401,
           allowedOrigin
         );
       }
 
-      try {
-        if (/^\/api\/topics\/[^/]+\/(collect|articles|collection-runs\/[^/]+)$/.test(url.pathname)) {
-          return await handleCollectionRequest(request, env.DB, env.NEWS_QUEUE, userId, allowedOrigin);
+      if (isNewsletterApi) {
+        try {
+          return await handleNewsletterRequest(
+            request,
+            env,
+            identity.userId,
+            identity.email,
+            allowedOrigin
+          );
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : "Unknown newsletter error";
+          console.error("Newsletter API error:", detail);
+          return jsonResponse({ error: "뉴스레터 처리 중 오류가 발생했습니다." }, 500, allowedOrigin);
         }
-        return await handleTopicsRequest(request, env.DB, userId, allowedOrigin);
+      }
+
+      if (isScrapsApi) {
+        try {
+          return await handleScrapsRequest(request, env.DB, identity.userId, allowedOrigin);
+        } catch (error) {
+          console.error("Scraps API error:", error);
+          return jsonResponse({ error: "An internal error occurred while processing saved news." }, 500, allowedOrigin);
+        }
+      }
+
+      try {
+        if (/^\\/api\\/topics\\/[^/]+\\/(collect|articles|collection-runs\\/[^/]+)$/.test(url.pathname)) {
+          return await handleCollectionRequest(
+            request,
+            env.DB,
+            env.NEWS_QUEUE,
+            identity.userId,
+            allowedOrigin
+          );
+        }
+        return await handleTopicsRequest(request, env.DB, identity.userId, allowedOrigin);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown database error";
         console.error("Topics API error:", message);
