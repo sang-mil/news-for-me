@@ -92,7 +92,7 @@ export async function searchGoogleNewsRss(
     const retryAfter = response.headers.get("retry-after") ?? "not provided";
     let bodyPreview = "";
     try {
-      bodyPreview = (await response.text()).replace(/\\s+/g, " ").trim().slice(0, 300);
+      bodyPreview = (await response.text()).replace(/\s+/g, " ").trim().slice(0, 300);
     } catch {
       bodyPreview = "response body could not be read";
     }
