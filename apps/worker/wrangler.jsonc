@@ -1,4 +1,4 @@
-﻿{
+{
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "news-for-me-api",
   "main": "src/index.ts",
@@ -49,7 +49,7 @@
   },
   "triggers": {
     "crons": [
-      "0 15 * * 0"
+      "0 15 * * SUN"
     ]
   },
   "workers_dev": false

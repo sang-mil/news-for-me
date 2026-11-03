@@ -1,4 +1,4 @@
-﻿import type { ApiHealthResponse } from "@news-for-me/shared";
+import type { ApiHealthResponse } from "@news-for-me/shared";
 import { handleTopicsRequest } from "./routes/topics";
 import { handleCollectionRequest } from "./routes/collection";
 import { handleScrapsRequest } from "./routes/scraps";
@@ -205,7 +205,7 @@ export default {
   },
 
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
-    if (controller.cron !== "0 15 * * 0") {
+    if (controller.cron !== "0 15 * * SUN") {
       console.log("Ignoring unrecognized scheduled event", controller.cron);
       return;
     }
