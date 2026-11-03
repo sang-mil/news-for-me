@@ -54,7 +54,7 @@ export function createXPostsSource(bearerToken: string): NewsSource {
       // X's recent-search endpoint requires at least 10 results per request.
       url.searchParams.set("max_results", String(requested));
       url.searchParams.set("sort_order", "relevancy");
-      url.searchParams.set("post.fields", "id,text,created_at,lang,public_metrics,author_id");
+      url.searchParams.set("tweet.fields", "id,text,created_at,lang,public_metrics,author_id");
       url.searchParams.set("expansions", "author_id");
       url.searchParams.set("user.fields", "id,name,username");
 
