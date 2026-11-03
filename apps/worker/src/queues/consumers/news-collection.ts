@@ -9,12 +9,13 @@ import { searchGitHubRepositories } from "../../services/news/sources/github-sea
 import { searchV2exTopics } from "../../services/news/sources/v2ex";
 import { createYouTubeVideosSource } from "../../services/news/sources/youtube";
 import { createXPostsSource } from "../../services/news/sources/x";
+import { createThreadsPostsSource } from "../../services/news/sources/threads";
 import { isSoftwareOrTechTopic } from "../../services/news/relevance";
 import { summarizeCollectedArticles } from "../../services/ai/summarizer";
 import type { AIEnvironment } from "../../services/ai/types";
 import type { CollectionJobMessage, NewsSource } from "../../services/news/types";
 
-interface CollectionConsumerEnv extends AIEnvironment { DB: D1Database; YOUTUBE_API_KEY?: string; X_BEARER_TOKEN?: string; }
+interface CollectionConsumerEnv extends AIEnvironment { DB: D1Database; YOUTUBE_API_KEY?: string; X_BEARER_TOKEN?: string; THREADS_ACCESS_TOKEN?: string; }
 
 function parseKeywords(value: string): string[] {
   try {
@@ -57,6 +58,12 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
     sources.push(createXPostsSource(env.X_BEARER_TOKEN.trim()));
   } else {
     skippedSources.push("x-api (missing X_BEARER_TOKEN)");
+  }
+
+  if (env.THREADS_ACCESS_TOKEN?.trim()) {
+    sources.push(createThreadsPostsSource(env.THREADS_ACCESS_TOKEN.trim()));
+  } else {
+    skippedSources.push("threads-api (missing THREADS_ACCESS_TOKEN)");
   }
   const collection = await collectFromSources(sources, searchInput, maxArticles);
   const sourceSummary = Object.entries(collection.sourceCounts).map(([id, count]) => id + "=" + count).join(", ");
