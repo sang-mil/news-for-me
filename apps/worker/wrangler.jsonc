@@ -7,7 +7,7 @@
     "enabled": true
   },
   "vars": {
-    "ALLOWED_ORIGIN": "https://news-for-me.pages.dev",
+    "ALLOWED_ORIGIN": "http://127.0.0.1:5173,http://localhost:5173,https://news-for-me.pages.dev",
     "BETTER_AUTH_URL": "https://news-for-me.pages.dev"
   },
   "d1_databases": [
