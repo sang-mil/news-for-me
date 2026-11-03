@@ -44,9 +44,8 @@ export function buildGoogleNewsQuery(
   includeKeywords: string[],
   excludeKeywords: string[]
 ): string {
-  const positives = [topicName, ...includeKeywords]
-    .map(safeQueryTerm)
-    .filter(Boolean)
+  const topicTerms = topicName.split(/[,，;；|]+/).map(safeQueryTerm).filter(Boolean);
+  const positives = [...new Set([...topicTerms, ...includeKeywords.map(safeQueryTerm).filter(Boolean)])]
     .slice(0, 8)
     .map((term) => `"${term}"`);
 
@@ -65,7 +64,8 @@ export function buildGoogleNewsQuery(
 
 export async function searchGoogleNewsRss(
   query: string,
-  excludeKeywords: string[]
+  excludeKeywords: string[],
+  maxResults = 10
 ): Promise<CollectedNewsItem[]> {
   const url = new URL("https://news.google.com/rss/search");
   url.searchParams.set("q", query);
@@ -150,7 +150,7 @@ export async function searchGoogleNewsRss(
       provider: "google-news-rss"
     });
 
-    if (collected.length >= 10) break;
+    if (collected.length >= maxResults) break;
   }
 
   return collected;
@@ -164,6 +164,6 @@ export const googleNewsRssSource: NewsSource = {
       input.includeKeywords,
       input.excludeKeywords
     );
-    return searchGoogleNewsRss(query, input.excludeKeywords);
+    return searchGoogleNewsRss(query, input.excludeKeywords, input.maxResults ?? 10);
   }
 };
