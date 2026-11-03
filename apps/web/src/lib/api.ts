@@ -72,8 +72,10 @@ export async function updateTopic(id: string, input: Partial<TopicInput>): Promi
 export async function deleteTopic(id: string): Promise<void> {
   await request<{ ok: boolean }>(`/api/topics/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
-export async function collectTopic(id: string): Promise<string> {
-  const response = await request<CollectionStartResponse>(`/api/topics/${encodeURIComponent(id)}/collect`, { method: "POST" });
+export async function collectTopic(id: string, maxArticles = 10): Promise<string> {
+  const response = await request<CollectionStartResponse>(`/api/topics/${encodeURIComponent(id)}/collect`, {
+    method: "POST", body: JSON.stringify({ maxArticles })
+  });
   return response.data.runId;
 }
 export async function getCollectionRun(topicId: string, runId: string): Promise<CollectionRun> {
