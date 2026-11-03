@@ -28,7 +28,7 @@ export function createAuth(env: BetterAuthEnvironment) {
 
   if (!baseURL || !secret || !clientId || !clientSecret) {
     throw new Error(
-      "Google authentication is not configured. Set BETTER_AUTH_SECRET, BETTER_AUTH_URL, GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET."
+      "Google authentication is not configured. Set BETTER_AUTH_SECRET, BETTER_AUTH_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and AUTH_ALLOWED_EMAIL."
     );
   }
 
