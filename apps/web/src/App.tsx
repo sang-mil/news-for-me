@@ -326,7 +326,7 @@ export default function App() {
     });
   }, [scraps, archiveQuery, archiveTagFilter]);
 
-  if (authStatus === "signed-out" || authStatus === "unavailable") {
+  if (authStatus !== "signed-in") {
     return (
       <main className="auth-shell">
         <section className="auth-card" aria-labelledby="auth-title">
@@ -337,17 +337,22 @@ export default function App() {
           <div className="auth-eyebrow">YOUR PERSONAL NEWSROOM</div>
           <h1 id="auth-title">나만의 뉴스룸에<br /><span>로그인하세요.</span></h1>
           <p>Google 계정으로 로그인하면 관심 주제와 스크랩, 개인 메모를 안전하게 불러옵니다.</p>
+          {authStatus === "checking" && (
+            <p className="auth-loading" role="status">로그인 상태를 확인하고 있습니다.</p>
+          )}
           {authStatus === "unavailable" && (
             <div className="auth-error" role="alert">
-              연결 또는 인증 설정을 확인할 수 없습니다. 잠시 후 다시 시도하거나 관리자 설정을 확인하세요.
+              연결 또는 인증 설정을 확인할 수 없습니다. 다시 시도하거나 관리자 설정을 확인하세요.
             </div>
           )}
           {error && <div className="auth-error" role="alert">{error}</div>}
-          <button className="google-signin-button" type="button" onClick={() => void handleGoogleSignIn()} disabled={isSigningIn || authStatus === "unavailable"}>
-            <span className="google-g" aria-hidden="true">G</span>
-            {isSigningIn ? "Google로 이동 중…" : "Google 계정으로 계속하기"}
-            <span className="google-arrow" aria-hidden="true">↗</span>
-          </button>
+          {(authStatus === "signed-out" || authStatus === "unavailable") && (
+            <button className="google-signin-button" type="button" onClick={() => void handleGoogleSignIn()} disabled={isSigningIn}>
+              <span className="google-g" aria-hidden="true">G</span>
+              {isSigningIn ? "Google로 이동 중…" : "Google 계정으로 계속하기"}
+              <span className="google-arrow" aria-hidden="true">↗</span>
+            </button>
+          )}
           {authStatus === "unavailable" && (
             <button className="auth-retry-button" type="button" onClick={() => void refresh()}>다시 연결 확인</button>
           )}
