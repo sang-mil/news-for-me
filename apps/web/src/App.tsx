@@ -367,6 +367,9 @@ export default function App() {
     let lastLoggedState = "";
 
     try {
+      // A refresh starts a new personal feed batch; saved articles remain in the archive.
+      await clearTopicArticles(topic.id);
+      setArticlesByTopic((current) => ({ ...current, [topic.id]: [] }));
       runId = await collectTopic(topic.id, collectionLimit);
       console.info("[NewsForMe][Collection] queued", {
         runId,

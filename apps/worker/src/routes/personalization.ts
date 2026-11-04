@@ -51,10 +51,10 @@ async function handleArticleOpen(
     ? await db.prepare(`
         SELECT a.canonical_url
         FROM articles a
-        INNER JOIN topic_articles ta ON ta.article_id = a.id
-        WHERE a.id = ? AND ta.topic_id = ?
+        INNER JOIN user_topic_articles uta ON uta.article_id = a.id
+        WHERE a.id = ? AND uta.topic_id = ? AND uta.user_id = ?
         LIMIT 1
-      `).bind(articleId, topicId).first<{ canonical_url: string }>()
+      `).bind(articleId, topicId, userId).first<{ canonical_url: string }>()
     : await db.prepare(`
         SELECT a.canonical_url
         FROM articles a

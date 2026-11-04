@@ -47,3 +47,31 @@ CREATE TABLE user_topic_feed_state (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
 );
+
+
+-- The article catalogue is shared, but a personalized feed belongs to one user.
+CREATE TABLE user_topic_articles (
+    user_id TEXT NOT NULL,
+    topic_id TEXT NOT NULL,
+    article_id TEXT NOT NULL,
+    match_reason TEXT,
+    linked_at TEXT NOT NULL DEFAULT
+        (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (user_id, topic_id, article_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
+    FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_user_topic_articles_feed
+    ON user_topic_articles(user_id, topic_id, linked_at DESC);
+
+-- Preserve the existing topic owner's current feed; other accounts start
+-- their own feed when they next collect that public topic.
+INSERT OR IGNORE INTO user_topic_articles (
+    user_id, topic_id, article_id, match_reason, linked_at
+)
+SELECT t.user_id, ta.topic_id, ta.article_id, ta.match_reason, ta.linked_at
+FROM topic_articles ta
+INNER JOIN topics t ON t.id = ta.topic_id
+WHERE t.is_active = 1;
