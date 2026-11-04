@@ -8,13 +8,12 @@ import {
 import { jsonResponse } from "../lib/http";
 import { sendGmailMessage } from "../services/email/gmail";
 import { renderNewsletter } from "../services/email/renderer";
+import { normalizeNewsletterRecipient } from "../services/email/recipient";
 import type { GmailEnvironment } from "../services/email/types";
 
 interface NewsletterEnv extends GmailEnvironment {
   DB: D1Database;
 }
-
-const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
 
 async function buildPreview(db: D1Database, userId: string) {
   const articles = await listRecentNewsletterArticles(db, userId, 7, 25);
@@ -25,7 +24,6 @@ export async function handleNewsletterRequest(
   request: Request,
   env: NewsletterEnv,
   userId: string,
-  authenticatedEmail: string,
   allowedOrigin: string
 ): Promise<Response> {
   const url = new URL(request.url);
@@ -39,22 +37,18 @@ export async function handleNewsletterRequest(
   }
 
   if (url.pathname === "/api/newsletter/send-test" && request.method === "POST") {
-    const body = await request.json().catch(() => null) as { confirm?: unknown } | null;
+    const body = await request.json().catch(() => null) as { confirm?: unknown; recipient?: unknown } | null;
     if (body?.confirm !== true) {
-      return jsonResponse({ error: "테스트 발송 확인값이 필요합니다." }, 400, allowedOrigin);
+      return jsonResponse({ error: "메일 발송 확인값이 필요합니다." }, 400, allowedOrigin);
     }
 
-    const recipient = authenticatedEmail.trim().toLowerCase();
-    const sender = env.GMAIL_SENDER?.trim().toLowerCase() ?? "";
-    if (!recipient || !EMAIL_RE.test(recipient)) {
-      return jsonResponse({ error: "Google 계정 이메일을 확인할 수 없습니다." }, 503, allowedOrigin);
+    const recipient = normalizeNewsletterRecipient(body.recipient);
+    const sender = normalizeNewsletterRecipient(env.GMAIL_SENDER);
+    if (!recipient) {
+      return jsonResponse({ error: "받는 사람 이메일 주소를 올바르게 입력하세요." }, 400, allowedOrigin);
     }
-    if (!sender || !EMAIL_RE.test(sender)) {
-      return jsonResponse({ error: "GMAIL_SENDER에 Gmail 발신 주소를 설정하세요." }, 503, allowedOrigin);
-    }
-    // Test delivery is restricted to the signed-in owner account that matches the configured sender.
-    if (recipient !== sender) {
-      return jsonResponse({ error: "안전한 테스트 발송을 위해 로그인 계정과 GMAIL_SENDER가 동일해야 합니다." }, 403, allowedOrigin);
+    if (!sender) {
+      return jsonResponse({ error: "GMAIL_SENDER에 올바른 Gmail 발신 주소를 설정하세요." }, 503, allowedOrigin);
     }
     if (!env.GOOGLE_CLIENT_ID?.trim() || !env.GOOGLE_CLIENT_SECRET?.trim() || !env.GOOGLE_REFRESH_TOKEN?.trim()) {
       return jsonResponse({ error: "Google OAuth 설정이 부족합니다. GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN을 확인하세요." }, 503, allowedOrigin);
@@ -66,7 +60,7 @@ export async function handleNewsletterRequest(
     }
 
     const deliveryId = crypto.randomUUID();
-    const idempotencyKey = `test:${userId}:${deliveryId}`;
+    const idempotencyKey = `newsletter:${userId}:${deliveryId}`;
     await createDeliveryLog(env.DB, {
       id: deliveryId,
       userId,
@@ -98,8 +92,8 @@ export async function handleNewsletterRequest(
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Unknown Gmail error";
       await markDeliveryFailed(env.DB, deliveryId, detail);
-      console.error("Newsletter test email failed", deliveryId, detail);
-      return jsonResponse({ error: "테스트 메일 발송에 실패했습니다.", details: [detail.slice(0, 300)], deliveryId }, 502, allowedOrigin);
+      console.error("Newsletter email failed", deliveryId, detail);
+      return jsonResponse({ error: "뉴스레터 메일 발송에 실패했습니다.", details: [detail.slice(0, 300)], deliveryId }, 502, allowedOrigin);
     }
   }
 

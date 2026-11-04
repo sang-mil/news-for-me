@@ -37,7 +37,7 @@ https://news-for-me.pages.dev/api/auth/callback/google
 
 추후 Cloudflare Pages에 커스텀 도메인을 연결하면 두 항목을 커스텀 도메인으로 바꾸고, Worker의 BETTER_AUTH_URL과 ALLOWED_ORIGIN도 동일한 도메인으로 변경합니다.
 
-현재 Gmail 발송에 쓰는 Google OAuth Client ID/Secret을 로그인에도 재사용합니다. Better Auth 로그인은 기본 Google 프로필 권한만 사용하고, Gmail Refresh Token은 테스트 메일 발송용으로 별도 유지합니다.
+현재 Gmail 발송에 쓰는 Google OAuth Client ID/Secret을 로그인에도 재사용합니다. Better Auth 로그인은 기본 Google 프로필 권한만 사용하고, Gmail Refresh Token은 뉴스레터 메일 발송용으로 별도 유지합니다.
 
 OAuth 동의 화면이 아직 Testing이라면 Google Auth Platform의 Test users에 로그인할 각 테스트 계정을 추가하세요. 이 상태에서 gmail.send 권한으로 발급한 Gmail Refresh Token은 7일 후 만료될 수 있습니다. 이는 Google 로그인 세션과 별개의 문제이며, 정기 뉴스레터 발송을 운영하려면 브랜딩·게시 및 필요한 Google 검증을 마친 뒤 Gmail Refresh Token을 새로 발급해야 합니다.
 
@@ -144,7 +144,7 @@ $integrationKey
 
 같은 D1 데이터를 읽는 모든 Worker 환경은 동일한 키를 사용해야 합니다.
 
-GMAIL_SENDER와 GOOGLE_REFRESH_TOKEN은 아직 서버 공용 Gmail 발신 연동입니다. 사용자별 Gmail OAuth 연결은 이번 API 키 설정 범위에 포함되지 않으므로, Gmail 테스트 발송은 GMAIL_SENDER 계정으로 로그인한 사용자만 사용할 수 있습니다.
+GMAIL_SENDER와 GOOGLE_REFRESH_TOKEN은 서버 공용 Gmail 발신 연동입니다. 발신 주소는 GMAIL_SENDER로 고정되지만, 뉴스레터 화면에서 로그인한 사용자가 수신 주소를 별도로 입력할 수 있습니다. 수신 주소가 발신 주소나 로그인 이메일과 같을 필요는 없습니다. 현재는 로그인한 사용자가 한 번에 한 명의 수신자에게 직접 발송하는 방식이며, 사용자별 Gmail OAuth 연결은 별도 작업입니다.
 
 LEGACY_USER_ID는 데이터를 이전한 경우 기존 운영 D1의 users.id입니다. 값이 틀리면 첫 로그인 데이터 연결이 실패합니다.
 
@@ -157,7 +157,7 @@ GEMINI_PROJECT_SLOT_1과 GEMINI_PROJECT_SLOT_2는 Secret이 아닌 일반 변수
 - BETTER_AUTH_URL=https://news-for-me.pages.dev
 - ALLOWED_ORIGIN=https://news-for-me.pages.dev
 
-GMAIL_SENDER는 Worker 대시보드의 Variables 또는 Secret로 등록합니다. 코드상 테스트 발송 수신자는 로그인한 이메일로 고정되어 있으며, 다른 주소를 클라이언트가 지정할 수 없습니다.
+GMAIL_SENDER는 Worker 대시보드의 Variables 또는 Secret로 등록합니다. 이 값은 발신 주소로 사용됩니다. 수신 주소는 화면에서 사용자가 입력하며, 서버에서 이메일 형식과 단일 수신자 여부를 다시 검증합니다. 실제 발송 전 화면에 최종 수신 주소를 표시하고 확인을 받습니다.
 
 ## 사용자별 API 연동 설정
 
@@ -292,4 +292,4 @@ BETTER_AUTH_URL=http://127.0.0.1:8787
 
 ## 알려진 배포 전제
 
-앱 데이터와 Gemini, OpenRouter, Threads, X, YouTube 연동 키는 사용자별로 분리됩니다. 다만 Gmail 발송은 아직 서버 공용 OAuth Refresh Token과 GMAIL_SENDER를 사용하므로, 해당 발신 주소와 로그인 이메일이 일치하는 계정만 테스트 메일을 보낼 수 있습니다. 사용자별 Gmail OAuth 연결은 별도 작업입니다.
+앱 데이터와 Gemini, OpenRouter, Threads, X, YouTube 연동 키는 사용자별로 분리됩니다. Gmail 발송은 서버 공용 OAuth Refresh Token과 GMAIL_SENDER를 사용하며, 로그인한 사용자는 자신의 뉴스 브리핑을 원하는 단일 수신 주소로 발송할 수 있습니다. 발신 주소와 로그인 이메일이 같을 필요는 없습니다. 사용자별 Gmail OAuth 연결은 별도 작업입니다.

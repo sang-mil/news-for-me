@@ -12,7 +12,7 @@
 - Cloudflare Queues 기반 비동기 AI 요약
 - 관심 주제별 기사 목록
 - 스크랩, 개인 메모, 사용자 태그와 검색/필터
-- 최근 AI 요약 뉴스레터 미리보기와 로그인 이메일로 Gmail 즉시 발송
+- 최근 AI 요약 뉴스레터 미리보기와 사용자가 지정한 이메일 주소로 Gmail 즉시 발송
 - Google OAuth 다중 사용자 로그인과 사용자별 D1 데이터 분리
 - Gemini, OpenRouter, Threads, X, YouTube API 키의 사용자별 설정 및 AES-GCM 암호화 저장
 - 매주 미스크랩 뉴스 정리
