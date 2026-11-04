@@ -1,4 +1,4 @@
-const EMAIL_RE = /^[^\\s@,;]+@[^\\s@,;]+\\.[^\\s@,;]+$/;
+const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
 
 export function normalizeNewsletterRecipient(value: unknown): string | null {
   if (typeof value !== "string") return null;
