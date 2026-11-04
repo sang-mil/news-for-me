@@ -6,6 +6,7 @@ import {
   removeUserIntegration,
   saveUserIntegration,
   updateUserIntegrationTestStatus,
+  testIntegrationCredential,
   type IntegrationConfig,
   type IntegrationProvider
 } from "../services/integrations";
@@ -59,44 +60,6 @@ function credentialValue(provider: IntegrationProvider, input: Record<string, un
     throw new Error("인증 정보는 8,192자 이하의 문자열이어야 합니다.");
   }
   return value.trim();
-}
-
-async function readResponseOk(response: Response): Promise<void> {
-  if (!response.ok) throw new Error("연결 실패 (HTTP " + response.status + "). 키와 API 권한을 확인하세요.");
-}
-
-async function testCredential(
-  provider: IntegrationProvider,
-  secret: string
-): Promise<void> {
-  const headers: Record<string, string> = { Accept: "application/json" };
-  let url = "";
-
-  if (provider === "gemini") {
-    url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1";
-    headers["x-goog-api-key"] = secret;
-  } else if (provider === "openrouter") {
-    url = "https://openrouter.ai/api/v1/models";
-    headers.Authorization = "Bearer " + secret;
-  } else if (provider === "threads") {
-    url = "https://graph.threads.net/v1.0/keyword_search?q=news&search_type=RECENT&search_mode=KEYWORD&limit=10&fields=id";
-    headers.Authorization = "Bearer " + secret;
-  } else if (provider === "x") {
-    const query = new URLSearchParams({ query: "from:twitterapi -is:retweet", max_results: "10" });
-    url = "https://api.x.com/2/tweets/search/recent?" + query.toString();
-    headers.Authorization = "Bearer " + secret;
-  } else {
-    const query = new URLSearchParams({ part: "id", id: "dQw4w9WgXcQ", key: secret });
-    url = "https://www.googleapis.com/youtube/v3/videos?" + query.toString();
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(url, { headers, signal: AbortSignal.timeout(12000) });
-  } catch {
-    throw new Error("외부 서비스에 연결하지 못했습니다. 잠시 후 다시 시도하세요.");
-  }
-  await readResponseOk(response);
 }
 
 export async function handleIntegrationsRequest(
@@ -175,7 +138,7 @@ export async function handleIntegrationsRequest(
     if (integration.config.enabled === false) {
       return jsonResponse({ error: "비활성화된 연동입니다. 먼저 사용 설정을 켜세요." }, 400, allowedOrigin);
     }
-    await testCredential(provider, secret);
+    await testIntegrationCredential(provider, secret);
     await updateUserIntegrationTestStatus(env.DB, userId, provider, "connected");
     return jsonResponse({ data: { ok: true, provider, message: "연결이 확인되었습니다." } }, 200, allowedOrigin);
   } catch (error) {

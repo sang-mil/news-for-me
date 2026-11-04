@@ -220,3 +220,40 @@ export async function resolveUserIntegrationSecret(
   if (!value || value.config.enabled === false) return null;
   return { secret: value.credentials.secret, config: value.config };
 }
+
+export async function testIntegrationCredential(
+  provider: IntegrationProvider,
+  secret: string
+): Promise<void> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  let url = "";
+
+  if (provider === "gemini") {
+    url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1";
+    headers["x-goog-api-key"] = secret;
+  } else if (provider === "openrouter") {
+    // The model catalog is public; this endpoint verifies the supplied key.
+    url = "https://openrouter.ai/api/v1/key";
+    headers.Authorization = "Bearer " + secret;
+  } else if (provider === "threads") {
+    url = "https://graph.threads.net/v1.0/keyword_search?q=news&search_type=RECENT&search_mode=KEYWORD&limit=10&fields=id";
+    headers.Authorization = "Bearer " + secret;
+  } else if (provider === "x") {
+    const query = new URLSearchParams({ query: "from:twitterapi -is:retweet", max_results: "10" });
+    url = "https://api.x.com/2/tweets/search/recent?" + query.toString();
+    headers.Authorization = "Bearer " + secret;
+  } else {
+    const query = new URLSearchParams({ part: "id", id: "dQw4w9WgXcQ", key: secret });
+    url = "https://www.googleapis.com/youtube/v3/videos?" + query.toString();
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, { headers, signal: AbortSignal.timeout(12000) });
+  } catch {
+    throw new Error("외부 서비스에 연결하지 못했습니다. 잠시 후 다시 시도하세요.");
+  }
+  if (!response.ok) {
+    throw new Error("연결 실패 (HTTP " + response.status + "). 키와 API 권한을 확인하세요.");
+  }
+}
