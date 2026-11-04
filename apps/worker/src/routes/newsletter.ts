@@ -24,7 +24,6 @@ export async function handleNewsletterRequest(
   request: Request,
   env: NewsletterEnv,
   userId: string,
-  authenticatedEmail: string,
   allowedOrigin: string
 ): Promise<Response> {
   const url = new URL(request.url);
