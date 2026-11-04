@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseInterestProfileResponse } from "../../apps/worker/src/services/ai/interest-profile.ts";
+import { parseInterestProfileResponse } from "../../apps/worker/src/services/ai/interest-profile-parser.ts";
 
 test("parses a Markdown profile and bounded search hints", () => {
   const result = parseInterestProfileResponse(JSON.stringify({
@@ -15,13 +15,7 @@ test("parses a Markdown profile and bounded search hints", () => {
 });
 
 test("accepts Gemini JSON fenced code blocks", () => {
-  const result = parseInterestProfileResponse(```json
-{
-  "markdown": "# 개인 뉴스 프로필",
-  "searchKeywords": ["Cloudflare"],
-  "excludeKeywords": []
-}
-```);
+  const result = parseInterestProfileResponse("prose before JSON? ```json\\n{\\n  \\"markdown\\": \\"# 개인 뉴스 프로필\\",\\n  \\"searchKeywords\\": [\\"Cloudflare\\"],\\n  \\"excludeKeywords\\": []\\n}\\n```");
   assert.equal(result.markdown, "# 개인 뉴스 프로필");
   assert.deepEqual(result.searchKeywords, ["Cloudflare"]);
 });
