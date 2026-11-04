@@ -8,7 +8,8 @@ import type {
   Topic,
   TopicInput,
   TopicListResponse,
-  TopicResponse
+  TopicResponse,
+  InterestProfile
 } from "@news-for-me/shared";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -81,6 +82,27 @@ export async function getCollectionRun(topicId: string, runId: string): Promise<
   const response = await request<{ data: CollectionRun }>(
     `/api/topics/${encodeURIComponent(topicId)}/collection-runs/${encodeURIComponent(runId)}`
   );
+  return response.data;
+}
+export async function clearTopicArticles(topicId: string): Promise<void> {
+  await request<{ ok: boolean }>(
+    `/api/topics/${encodeURIComponent(topicId)}/articles/clear`,
+    { method: "POST", body: "{}" }
+  );
+}
+export function articleOpenUrl(articleId: string, topicId?: string): string {
+  const query = topicId ? `?topicId=${encodeURIComponent(topicId)}` : "";
+  return `/api/articles/${encodeURIComponent(articleId)}/open${query}`;
+}
+export async function getInterestProfile(): Promise<InterestProfile> {
+  const response = await request<{ data: InterestProfile }>("/api/interest-profile");
+  return response.data;
+}
+export async function refreshInterestProfile(): Promise<InterestProfile> {
+  const response = await request<{ data: InterestProfile }>("/api/interest-profile/refresh", {
+    method: "POST",
+    body: "{}"
+  });
   return response.data;
 }
 export async function listTopicArticles(topicId: string, limit = 20): Promise<NewsArticle[]> {

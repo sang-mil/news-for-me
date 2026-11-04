@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type {
   ApiHealthResponse, CollectionRun, NewsArticle, SavedNewsArticle,
-  SavedNewsTag, Topic, TopicInput, TopicListResponse
+  SavedNewsTag, Topic, TopicInput, TopicListResponse, InterestProfile
 } from "@news-for-me/shared";
 import {
   collectTopic, createTopic, deleteTopic, getApiHealth, getCollectionRun, getCurrentUser,
   listTopicArticles, listScraps, listTags, listTopics, updateTopic,
   saveArticle, unsaveArticle, updateScrapNote, replaceScrapTags,
-  createTag, deleteTag, updateTag
+  createTag, deleteTag, updateTag, articleOpenUrl, clearTopicArticles,
+  getInterestProfile, refreshInterestProfile
 } from "./lib/api";
 import { signInWithGoogle, signOutFromNewsForMe } from "./lib/auth-client";
 import Settings from "./features/settings/Settings";
@@ -59,6 +60,9 @@ export default function App() {
   const [articlesByTopic, setArticlesByTopic] = useState<Record<string, NewsArticle[]>>({});
   const [scraps, setScraps] = useState<SavedNewsArticle[]>([]);
   const [tags, setTags] = useState<SavedNewsTag[]>([]);
+  const [interestProfile, setInterestProfile] = useState<InterestProfile | null>(null);
+  const [isRefreshingProfile, setIsRefreshingProfile] = useState(false);
+  const [clearingTopicId, setClearingTopicId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [tagDrafts, setTagDrafts] = useState<Record<string, string[]>>({});
   const [archiveQuery, setArchiveQuery] = useState("");
@@ -92,14 +96,15 @@ export default function App() {
         setTopicPagination({page:1,limit:5,totalItems:0,totalPages:1,ownedCount:0});
         setScraps([]);
         setTags([]);
+        setInterestProfile(null);
         return;
       }
 
       setAuthUser({ ...identity.user, isDevelopment: identity.isDevelopment });
       setAuthStatus("signed-in");
 
-      const [apiHealth, topicList, savedArticles, userTags] = await Promise.all([
-        getApiHealth(), listTopics(1,5), listScraps(), listTags()
+      const [apiHealth, topicList, savedArticles, userTags, profile] = await Promise.all([
+        getApiHealth(), listTopics(1,5), listScraps(), listTags(), getInterestProfile()
       ]);
       setHealth(apiHealth);
       setStatus("online");
@@ -107,6 +112,7 @@ export default function App() {
       setTopicPagination(topicList.pagination);
       setScraps(savedArticles);
       setTags(userTags);
+      setInterestProfile(profile);
     } catch (err) {
       setAuthStatus("unavailable");
       setStatus("offline");
@@ -231,6 +237,7 @@ export default function App() {
         setNotice("뉴스를 스크랩 보관함에 저장했어요.");
       }
       await reloadScraps();
+      setInterestProfile(await getInterestProfile());
     } catch (err) {
       setError(err instanceof Error ? err.message : "스크랩 처리에 실패했습니다.");
     }
@@ -308,6 +315,51 @@ export default function App() {
       setError(err instanceof Error ? err.message : "태그 삭제에 실패했습니다.");
     }
   }
+  async function handleClearArticles(topic: Topic) {
+    if (!window.confirm(`'${topic.name}'의 현재 기사 목록을 비울까요? 스크랩 보관함의 기사는 유지됩니다.`)) return;
+    setClearingTopicId(topic.id);
+    setError(""); setNotice("");
+    try {
+      await clearTopicArticles(topic.id);
+      setArticlesByTopic((current) => ({ ...current, [topic.id]: [] }));
+      setNotice("현재 기사 목록을 비웠어요. 스크랩한 기사는 보관함에 남아 있습니다.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "기사 목록을 비우지 못했습니다.");
+    } finally {
+      setClearingTopicId(null);
+    }
+  }
+
+  async function handleRefreshProfile() {
+    setIsRefreshingProfile(true);
+    setError(""); setNotice("");
+    try {
+      const profile = await refreshInterestProfile();
+      setInterestProfile(profile);
+      setNotice("Gemini가 최근 열람·스크랩 기록을 반영해 관심사 프로필을 갱신했어요.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "관심사 프로필을 갱신하지 못했습니다.");
+    } finally {
+      setIsRefreshingProfile(false);
+    }
+  }
+
+  function handleDownloadProfile() {
+    if (!interestProfile?.markdown) {
+      setNotice("먼저 Gemini로 관심사 프로필을 생성해 주세요.");
+      return;
+    }
+    const blob = new Blob([interestProfile.markdown], { type: "text/markdown;charset=utf-8" });
+    const downloadUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = downloadUrl;
+    anchor.download = "interest-profile.md";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(downloadUrl);
+  }
+
   async function handleCollect(topic: Topic) {
     setCollectingTopicId(topic.id); setError(""); setNotice("");
     let runId: string | null = null;
@@ -522,6 +574,31 @@ export default function App() {
 
       <section className="workspace-grid">
         <section className="topics-section" id="topics" aria-labelledby="topics-title">
+          <div className="interest-profile-panel">
+            <div className="interest-profile-copy">
+              <div className="section-kicker">GEMINI PERSONALIZATION</div>
+              <h3>내 관심사 프로필</h3>
+              <p>열어본 기사와 스크랩, 보관 메모·태그를 분석해 다음 뉴스 검색에 반영합니다.</p>
+              <div className="interest-profile-meta">
+                <span>행동 기록 {interestProfile?.totalEventCount ?? 0}건</span>
+                <span>마지막 분석 · {interestProfile?.analyzedAt ? formatDate(interestProfile.analyzedAt) : "아직 분석 전"}</span>
+                {interestProfile?.modelName && <span>모델 · {interestProfile.modelName}</span>}
+              </div>
+              {Boolean(interestProfile?.searchKeywords.length) && (
+                <div className="interest-keywords">
+                  {interestProfile?.searchKeywords.map((keyword) => <span key={keyword}>{keyword}</span>)}
+                </div>
+              )}
+            </div>
+            <div className="interest-profile-actions">
+              <button type="button" className="icon-button collect-button" onClick={() => void handleRefreshProfile()} disabled={isRefreshingProfile}>
+                {isRefreshingProfile ? "분석 중…" : "관심사 분석 갱신"}
+              </button>
+              <button type="button" className="icon-button" onClick={handleDownloadProfile} disabled={!interestProfile?.markdown}>
+                MD 파일 다운로드
+              </button>
+            </div>
+          </div>
           <div className="section-heading topics-heading">
             <div><div className="section-kicker">YOUR TOPICS</div><h2 id="topics-title">관심 주제와 최신 뉴스</h2></div>
             <div className="section-heading-actions">
@@ -563,13 +640,23 @@ export default function App() {
                       )}
                       {expandedTopicId === topic.id && (
                         <div className="article-list" id={`articles-${topic.id}`}>
-                          <div className="article-list-heading">최근 수집 기사</div>
+                          <div className="article-list-heading article-list-toolbar">
+                            <span>새로 수집한 기사</span>
+                            <div className="article-list-toolbar-actions">
+                              <button type="button" onClick={() => void handleCollect(topic)} disabled={collectingTopicId !== null || status !== "online"}>
+                                {collectingTopicId === topic.id ? "새로고침 중…" : "새로고침"}
+                              </button>
+                              <button type="button" onClick={() => void handleClearArticles(topic)} disabled={clearingTopicId === topic.id || !articles?.length}>
+                                {clearingTopicId === topic.id ? "비우는 중…" : "비우기"}
+                              </button>
+                            </div>
+                          </div>
                           {!articles || articles.length === 0 ? <p className="article-empty">저장된 기사가 없습니다. 뉴스 수집을 실행해 보세요.</p> : articles.map((article) => {
                             const isScrapped = scraps.some((saved) => saved.id === article.id);
                             return (
                               <div className="article-item article-item-with-action" key={article.id}>
                                 <div className="article-item-content">
-                                  <a href={article.canonicalUrl} target="_blank" rel="noreferrer">{article.title}</a>
+                                  <a href={articleOpenUrl(article.id, topic.id)} target="_blank" rel="noreferrer">{article.title}</a>
                                   <div className="article-meta">{article.sourceName ?? "출처 미상"} · {formatDate(article.publishedAt)}</div>
                                   {article.contentExcerpt && <p>{article.contentExcerpt}</p>}
                                 </div>
@@ -589,7 +676,7 @@ export default function App() {
                           {[5, 10, 15, 20, 30].map((count) => <option key={count} value={count}>{count}개</option>)}
                         </select>
                       </label>
-                      <button type="button" className="icon-button collect-button" onClick={() => void handleCollect(topic)} disabled={collectingTopicId !== null || status !== "online"}>{collectingTopicId === topic.id ? "수집 중…" : "뉴스 수집"}</button>
+                      <button type="button" className="icon-button collect-button" onClick={() => void handleCollect(topic)} disabled={collectingTopicId !== null || status !== "online"}>{collectingTopicId === topic.id ? "수집 중…" : "새로고침"}</button>
                       <button
                         type="button"
                         className="icon-button"
@@ -692,7 +779,7 @@ export default function App() {
               return (
                 <article className="scrap-card archive-card" key={article.id}>
                   <div className="scrap-card-content">
-                    <a href={article.canonicalUrl} target="_blank" rel="noreferrer">{article.title}</a>
+                    <a href={articleOpenUrl(article.id)} target="_blank" rel="noreferrer">{article.title}</a>
                     <div className="article-meta">{article.sourceName ?? "출처 미상"} · 발행 {formatDate(article.publishedAt)} · 스크랩 {formatDate(article.savedAt)}</div>
                     {article.contentExcerpt && <p>{article.contentExcerpt}</p>}
                   </div>
