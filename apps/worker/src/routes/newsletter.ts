@@ -15,8 +15,6 @@ interface NewsletterEnv extends GmailEnvironment {
   DB: D1Database;
 }
 
-const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
-
 async function buildPreview(db: D1Database, userId: string) {
   const articles = await listRecentNewsletterArticles(db, userId, 7, 25);
   return renderNewsletter(articles, 7);
@@ -26,7 +24,7 @@ export async function handleNewsletterRequest(
   request: Request,
   env: NewsletterEnv,
   userId: string,
-  authenticatedEmail: string,
+  _authenticatedEmail: string,
   allowedOrigin: string
 ): Promise<Response> {
   const url = new URL(request.url);
@@ -63,7 +61,7 @@ export async function handleNewsletterRequest(
     }
 
     const deliveryId = crypto.randomUUID();
-    const idempotencyKey = `test:${userId}:${deliveryId}`;
+    const idempotencyKey = `newsletter:${userId}:${deliveryId}`;
     await createDeliveryLog(env.DB, {
       id: deliveryId,
       userId,
@@ -95,7 +93,7 @@ export async function handleNewsletterRequest(
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Unknown Gmail error";
       await markDeliveryFailed(env.DB, deliveryId, detail);
-      console.error("Newsletter test email failed", deliveryId, detail);
+      console.error("Newsletter email failed", deliveryId, detail);
       return jsonResponse({ error: "뉴스레터 메일 발송에 실패했습니다.", details: [detail.slice(0, 300)], deliveryId }, 502, allowedOrigin);
     }
   }
