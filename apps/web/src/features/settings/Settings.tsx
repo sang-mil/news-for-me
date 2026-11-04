@@ -115,7 +115,10 @@ export default function Settings() {
       });
 
       const geminiStatus = rows.find((row) => row.provider === "gemini");
-      if ((geminiStatus?.configured && geminiStatus.enabled) || geminiStatus?.platformDefaultAvailable) {
+      const canLoadGeminiModels = geminiStatus?.configured
+        ? geminiStatus.enabled
+        : geminiStatus?.platformDefaultAvailable === true;
+      if (canLoadGeminiModels) {
         try {
           setGeminiModels(await getGeminiModels());
           setGeminiModelsError("");
@@ -298,7 +301,7 @@ export default function Settings() {
                               </option>
                             ))}
                           </select>
-                          <small>선택한 모델을 먼저 사용합니다. 실패하면 이 API 키에서 사용 가능한 다른 무료 모델을 자동으로 시도합니다.</small>
+                          <small>선택한 모델을 먼저 사용합니다. 실패하면 이 API 키에서 사용할 수 있는 다른 무료 등급 확인 모델을 자동으로 시도합니다.</small>
                           {geminiModelsError && <small>{geminiModelsError}</small>}
                         </label>
                         <label className="integration-checkbox">
