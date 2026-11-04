@@ -95,3 +95,10 @@ test("model list uses the supplied API key and follows catalog pagination", asyn
 test("empty catalog keeps the conservative free-tier fallback", () => {
   assert.deepEqual(resolveGeminiModelOrder([], "unknown-model", undefined, false), [...FREE_TIER_GEMINI_MODEL_IDS]);
 });
+
+test("paid-only catalog is not called when paid models are disabled", () => {
+  const models = parseGeminiModelCatalog({
+    models: [{ name: "models/gemini-4-argon", supportedGenerationMethods: ["generateContent"] }]
+  });
+  assert.deepEqual(resolveGeminiModelOrder(models, undefined, undefined, false), []);
+});
