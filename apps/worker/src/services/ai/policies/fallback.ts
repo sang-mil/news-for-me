@@ -110,7 +110,7 @@ export async function routeSummaryRequest(
   const invalidKeys = new Set<string>();
   let lastError: AIProviderError | null = null;
 
-  // Key 1: primary model -> fallback model. Then key 2: same model order.
+  // For each eligible key, prefer the selected Gemini model then walk the discovered model catalog.
   for (const key of keys) {
     if (key.slot === "gemini-key-2" && skipKey2AfterQuota) continue;
     if (invalidKeys.has(key.slot)) continue;
