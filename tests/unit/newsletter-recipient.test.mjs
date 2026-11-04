@@ -18,7 +18,7 @@ test("rejects malformed and multi-recipient addresses", () => {
   assert.equal(normalizeNewsletterRecipient("person@example"), null);
   assert.equal(normalizeNewsletterRecipient("person@example.com,other@example.com"), null);
   assert.equal(normalizeNewsletterRecipient("person@example.com;other@example.com"), null);
-  assert.equal(normalizeNewsletterRecipient("person@example.com\\r\\nBcc:other@example.com"), null);
+  assert.equal(normalizeNewsletterRecipient("person@example.com\r\nBcc:other@example.com"), null);
 });
 
 test("rejects addresses longer than the email length limit", () => {
