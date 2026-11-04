@@ -2,6 +2,7 @@ import { jsonResponse } from "../lib/http";
 import { listGeminiModels } from "../services/ai/gemini-models";
 import {
   getUserIntegration,
+  isMissingUserIntegrationsTableError,
   isIntegrationProvider,
   listUserIntegrationStatuses,
   removeUserIntegration,
@@ -31,6 +32,15 @@ function platformDefaults(env: IntegrationRouteEnvironment): Record<IntegrationP
     x: Boolean(env.X_BEARER_TOKEN?.trim()),
     youtube: Boolean(env.YOUTUBE_API_KEY?.trim())
   };
+}
+
+
+function missingIntegrationSchemaResponse(error: unknown, allowedOrigin: string): Response | null {
+  if (!isMissingUserIntegrationsTableError(error)) return null;
+  return jsonResponse({
+    error: "사용자별 API 키 저장 테이블이 D1에 없습니다. Worker 디렉터리에서 'npx wrangler d1 migrations list news-for-me-db --remote'로 상태를 확인하고, 0007_user_integrations.sql이 대기 중이면 'npx wrangler d1 migrations apply news-for-me-db --remote'를 실행하세요. wrangler.jsonc의 DB 바인딩이 운영 D1을 가리키는지도 확인해야 합니다.",
+    code: "INTEGRATION_SCHEMA_NOT_READY"
+  }, 503, allowedOrigin);
 }
 
 function parseConfig(value: unknown): IntegrationConfig {
@@ -73,8 +83,14 @@ export async function handleIntegrationsRequest(
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "");
   if (path === "/api/integrations" && request.method === "GET") {
-    const data = await listUserIntegrationStatuses(env.DB, userId, platformDefaults(env));
-    return jsonResponse({ data }, 200, allowedOrigin);
+    try {
+      const data = await listUserIntegrationStatuses(env.DB, userId, platformDefaults(env));
+      return jsonResponse({ data }, 200, allowedOrigin);
+    } catch (error) {
+      const schemaResponse = missingIntegrationSchemaResponse(error, allowedOrigin);
+      if (schemaResponse) return schemaResponse;
+      throw error;
+    }
   }
 
   if (path === "/api/integrations/gemini/models" && request.method === "GET") {
@@ -114,6 +130,8 @@ export async function handleIntegrationsRequest(
       const data = [...models.values()].sort((a, b) => a.id.localeCompare(b.id));
       return jsonResponse({ data }, 200, allowedOrigin);
     } catch (error) {
+      const schemaResponse = missingIntegrationSchemaResponse(error, allowedOrigin);
+      if (schemaResponse) return schemaResponse;
       return jsonResponse(
         { error: error instanceof Error ? error.message : "Gemini 모델 목록을 불러오지 못했습니다." },
         502,
@@ -138,8 +156,14 @@ export async function handleIntegrationsRequest(
   const isTest = match[2] === "test";
 
   if (request.method === "DELETE" && !isTest) {
-    await removeUserIntegration(env.DB, userId, provider);
-    return jsonResponse({ ok: true }, 200, allowedOrigin);
+    try {
+      await removeUserIntegration(env.DB, userId, provider);
+      return jsonResponse({ ok: true }, 200, allowedOrigin);
+    } catch (error) {
+      const schemaResponse = missingIntegrationSchemaResponse(error, allowedOrigin);
+      if (schemaResponse) return schemaResponse;
+      throw error;
+    }
   }
 
   if (request.method !== "PUT" && !(request.method === "POST" && isTest)) {
@@ -168,6 +192,8 @@ export async function handleIntegrationsRequest(
       const data = await listUserIntegrationStatuses(env.DB, userId, platformDefaults(env));
       return jsonResponse({ data: data.find((item) => item.provider === provider) }, 200, allowedOrigin);
     } catch (error) {
+      const schemaResponse = missingIntegrationSchemaResponse(error, allowedOrigin);
+      if (schemaResponse) return schemaResponse;
       return jsonResponse(
         { error: error instanceof Error ? error.message : "연동 정보를 저장하지 못했습니다." },
         400,
@@ -189,7 +215,14 @@ export async function handleIntegrationsRequest(
     await updateUserIntegrationTestStatus(env.DB, userId, provider, "connected");
     return jsonResponse({ data: { ok: true, provider, message: "연결이 확인되었습니다." } }, 200, allowedOrigin);
   } catch (error) {
-    await updateUserIntegrationTestStatus(env.DB, userId, provider, "error");
+    const schemaResponse = missingIntegrationSchemaResponse(error, allowedOrigin);
+    if (schemaResponse) return schemaResponse;
+    try {
+      await updateUserIntegrationTestStatus(env.DB, userId, provider, "error");
+    } catch (statusError) {
+      const statusSchemaResponse = missingIntegrationSchemaResponse(statusError, allowedOrigin);
+      if (statusSchemaResponse) return statusSchemaResponse;
+    }
     const message = error instanceof Error ? error.message : "연결 테스트에 실패했습니다.";
     return jsonResponse({ error: message }, 502, allowedOrigin);
   }

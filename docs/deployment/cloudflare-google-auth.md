@@ -165,6 +165,36 @@ GMAIL_SENDER는 Worker 대시보드의 Variables 또는 Secret로 등록합니�
 
 X 연결 테스트는 최근 검색 API를 호출할 수 있으므로 X API 사용량 또는 비용이 발생할 수 있습니다. YouTube 연결 테스트도 소량의 quota를 사용합니다.
 
+### D1에서 user_integrations 테이블이 없다고 나오는 경우
+
+API 키 저장 시 `D1_ERROR: no such table: user_integrations`가 발생하면 Worker가 연결된 운영 D1에 `0007_user_integrations.sql` 마이그레이션이 적용되지 않았거나, Worker의 DB 바인딩이 다른 D1을 가리키는 것입니다. API 키를 다시 입력해도 해결되지 않습니다.
+
+저장소 루트의 PowerShell에서 아래 배포 스크립트를 실행할 수 있습니다.
+
+~~~powershell
+Set-Location C:\dev\news-for-me
+.\scripts\Deploy-NewsForMe-Worker.ps1
+~~~
+
+스크립트는 `apps/worker/wrangler.jsonc`의 DB 바인딩 이름과 ID를 먼저 보여주고, 원격 D1 백업을 `.local-backups`에 저장한 뒤 마이그레이션 목록을 출력합니다. 목록에서 `0001`~`0006`이 적용되었고 `0007_user_integrations.sql`만 대기 중인지 직접 확인한 경우에만 `APPLY-PENDING`을 입력하세요. 스크립트는 테이블 존재 여부를 검증하기 전에는 Worker를 배포하지 않습니다.
+
+직접 수동으로 진행하려면 Worker 폴더에서 먼저 다음 명령을 실행합니다.
+
+~~~powershell
+Set-Location C:\dev\news-for-me\apps\worker
+npx wrangler d1 migrations list news-for-me-db --remote
+~~~
+
+`0001`~`0006`이 적용되었고 `0007_user_integrations.sql`만 대기 중인 것을 확인한 후에만 적용합니다.
+
+~~~powershell
+npx wrangler d1 migrations apply news-for-me-db --remote
+npx wrangler d1 execute news-for-me-db --remote --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'user_integrations';"
+~~~
+
+마지막 조회 결과에 `user_integrations`가 나와야 합니다. 결과가 없거나 마이그레이션 목록에는 0007이 이미 적용된 것으로 나오면 추가 SQL을 임의로 실행하지 마세요. `apps/worker/wrangler.jsonc`의 `d1_databases[0].database_id`와 Cloudflare Dashboard의 D1 데이터베이스 ID, Worker의 `DB` 바인딩이 모두 같은지 확인해야 합니다.
+
+
 ## 서버 기본 뉴스 수집 소스 (선택)
 
 개별 사용자가 키를 등록하지 않은 경우를 위해 기존 Worker Secret을 공유 기본값으로 남겨둘 수 있습니다. 사용자가 개인 키를 저장한 서비스는 해당 키를 우선 사용합니다.
