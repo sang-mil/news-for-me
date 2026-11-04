@@ -175,7 +175,6 @@ export default {
             request,
             env,
             identity.userId,
-            identity.email,
             allowedOrigin
           );
         } catch (error) {
