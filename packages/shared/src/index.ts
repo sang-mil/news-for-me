@@ -8,6 +8,8 @@
 export interface Topic {
   id: string;
   name: string;
+  createdByName: string;
+  isOwner: boolean;
   description: string | null;
   includeKeywords: string[];
   excludeKeywords: string[];
@@ -24,7 +26,10 @@ export interface TopicInput {
   excludeKeywords?: string[];
 }
 
-export interface TopicListResponse { data: Topic[]; }
+export interface TopicListResponse {
+  data: Topic[];
+  pagination: { page: number; limit: number; totalItems: number; totalPages: number; ownedCount: number; };
+}
 export interface TopicResponse { data: Topic; }
 export interface ApiErrorResponse { error: string; details?: string[]; }
 export type CollectionStatus = "queued" | "running" | "completed" | "failed";
