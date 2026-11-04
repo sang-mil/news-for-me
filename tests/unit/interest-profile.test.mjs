@@ -15,7 +15,16 @@ test("parses a Markdown profile and bounded search hints", () => {
 });
 
 test("accepts Gemini JSON fenced code blocks", () => {
-  const result = parseInterestProfileResponse("prose before JSON? ```json\\n{\\n  \\"markdown\\": \\"# 개인 뉴스 프로필\\",\\n  \\"searchKeywords\\": [\\"Cloudflare\\"],\\n  \\"excludeKeywords\\": []\\n}\\n```");
+  const fenced = [
+    "```json",
+    JSON.stringify({
+      markdown: "# 개인 뉴스 프로필",
+      searchKeywords: ["Cloudflare"],
+      excludeKeywords: []
+    }, null, 2),
+    "```"
+  ].join("\n");
+  const result = parseInterestProfileResponse(fenced);
   assert.equal(result.markdown, "# 개인 뉴스 프로필");
   assert.deepEqual(result.searchKeywords, ["Cloudflare"]);
 });
