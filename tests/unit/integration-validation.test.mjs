@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { testCredential } from "../../apps/worker/src/routes/integrations.ts";
+import { testIntegrationCredential } from "../../apps/worker/src/services/integrations.ts";
 
 test("OpenRouter validation authenticates against the private current-key endpoint", async () => {
   const originalFetch = globalThis.fetch;
@@ -16,7 +16,7 @@ test("OpenRouter validation authenticates against the private current-key endpoi
   };
 
   try {
-    await testCredential("openrouter", "sk-or-test-key");
+    await testIntegrationCredential("openrouter", "sk-or-test-key");
     assert.equal(requestedUrl, "https://openrouter.ai/api/v1/key");
     assert.equal(authorization, "Bearer sk-or-test-key");
   } finally {
@@ -33,7 +33,7 @@ test("OpenRouter validation rejects an invalid key", async () => {
 
   try {
     await assert.rejects(
-      () => testCredential("openrouter", "sk-or-invalid"),
+      () => testIntegrationCredential("openrouter", "sk-or-invalid"),
       /HTTP 401/
     );
   } finally {
