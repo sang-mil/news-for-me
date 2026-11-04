@@ -446,10 +446,10 @@ export default function App() {
           <span className="brand-wordmark">News for Me<span>YOUR PERSONAL NEWSROOM</span></span>
         </a>
         <nav className="top-nav" aria-label="주요 메뉴">
+          <a href="#topics">뉴스룸</a>
           <a href="#archive">보관함</a>
-          <a href="#topics">관심 주제</a>
-          <a href="#settings">연동 설정</a>
           <a href="#newsletter">메일 브리핑</a>
+          <a href="#settings">연동 설정</a>
           <a className="top-nav-cta" href="#topic-form">주제 추가 <span aria-hidden="true">↗</span></a>
         </nav>
         {authUser && !authUser.isDevelopment && (
@@ -467,44 +467,34 @@ export default function App() {
       <section className="intro-section" aria-labelledby="hero-title">
         <div className="intro-main">
           <div className="eyebrow"><span className="eyebrow-mark" /> YOUR PERSONAL NEWSROOM · VOL. 01</div>
-          <h1 id="hero-title">관심을 따라 읽고,<br /><span>나만의 흐름을 만듭니다.</span></h1>
-          <p className="intro-copy">관심 주제를 정하면 필요한 뉴스를 한곳에 모읍니다. 기억하고 싶은 기사는 스크랩하고, 메모와 태그로 나만의 맥락을 쌓아 보세요.</p>
+          <h1 id="hero-title">관심 뉴스를 모으고,<br /><span>중요한 흐름에 집중하세요.</span></h1>
+          <p className="intro-copy">관심 주제를 등록하고 뉴스 수집을 실행하면, 나에게 필요한 최신 소식을 한곳에서 확인할 수 있습니다.</p>
           <div className="intro-meta">
             <span className="meta-icon" aria-hidden="true">✳</span>
             <span>D1에 저장되는 나만의 뉴스 아카이브</span>
             {health && <span className="meta-time">마지막 연결 {new Date(health.timestamp).toLocaleTimeString("ko-KR")}</span>}
           </div>
           <div className="hero-actions">
-            <a className="hero-primary-link" href="#topics">관심 주제 살펴보기 <span aria-hidden="true">↘</span></a>
-            <span className="hero-note">세상의 소음보다, 나에게 중요한 신호.</span>
+            <a className="hero-primary-link" href="#topics">뉴스룸 바로가기 <span aria-hidden="true">↘</span></a>
+            <a className="hero-secondary-link" href="#topic-form">새 관심 주제 추가 <span aria-hidden="true">＋</span></a>
           </div>
         </div>
 
         <aside className="hero-panel" aria-label="내 뉴스룸 현황">
           <div className="hero-panel-core">
             <div className="hero-panel-header">
-              <span>THE DAILY EDITION</span>
+              <span>MY NEWSROOM</span>
               <span className={`hero-sync ${status}`}><i />{status === "online" ? "SYNCED" : status === "checking" ? "CONNECTING" : "OFFLINE"}</span>
             </div>
-            <div className="hero-art" aria-hidden="true">
-              <span className="hero-orbit hero-orbit-one" />
-              <span className="hero-orbit hero-orbit-two" />
-              <span className="hero-signal signal-one" />
-              <span className="hero-signal signal-two" />
-              <span className="hero-signal signal-three" />
-              <span className="hero-art-letter">n</span>
-              <span className="hero-art-index">N° 01</span>
-            </div>
             <div className="hero-panel-copy">
-              <span>YOUR SIGNAL, NOT THE NOISE</span>
-              <h2>오늘의 관심이<br />내일의 인사이트가 되도록.</h2>
+              <span>YOUR INTERESTS, EDITED FOR YOU</span>
+              <h2>관심사에 맞춘 뉴스 흐름을<br />한눈에 관리하세요.</h2>
             </div>
             <div className="hero-stats">
               <div><strong>{topics.length.toString().padStart(2, "0")}</strong><span>관심 주제</span></div>
-              <div><strong>{scraps.length.toString().padStart(2, "0")}</strong><span>보관한 기사</span></div>
+              <div><strong>{scraps.length.toString().padStart(2, "0")}</strong><span>저장한 기사</span></div>
               <div><strong>{tags.length.toString().padStart(2, "0")}</strong><span>나만의 태그</span></div>
             </div>
-            <div className="hero-panel-footer"><span>CURATED FOR YOU</span><span>NEWS / FOR ME</span></div>
           </div>
         </aside>
       </section>
@@ -516,8 +506,113 @@ export default function App() {
         </div>
       )}
 
-      <Settings />
-      <Newsletter userEmail={authUser?.email ?? ""} />
+      <section className="workspace-grid">
+        <section className="topics-section" id="topics" aria-labelledby="topics-title">
+          <div className="section-heading topics-heading">
+            <div><div className="section-kicker">YOUR TOPICS</div><h2 id="topics-title">관심 주제와 최신 뉴스</h2></div>
+            <div className="section-heading-actions">
+              <span className="count-badge">{topics.length}개 주제</span>
+              <a className="section-action-link" href="#topic-form">주제 추가 <span aria-hidden="true">＋</span></a>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="empty-state"><div className="loading-spinner" /><p>관심 항목을 불러오는 중입니다.</p></div>
+          ) : topics.length === 0 ? (
+            <div className="empty-state"><div className="empty-symbol">✳</div><h3>아직 등록된 관심 항목이 없어요.</h3><p>오른쪽에서 첫 번째 관심 주제를 추가해 보세요.</p></div>
+          ) : (
+            <div className="topic-list">
+              {topics.map((topic) => {
+                const run = collectionRuns[topic.id];
+                const articles = articlesByTopic[topic.id];
+                return (
+                  <article className="topic-card" key={topic.id}>
+                    <div className="topic-card-main">
+                      <div className="topic-card-title-row"><h3>{topic.name}</h3><span className="topic-date">{formatDate(topic.createdAt)}</span></div>
+                      {topic.description && <p className="topic-description">{topic.description}</p>}
+                      <div className="keyword-groups">
+                        {topic.includeKeywords.length > 0 && <div className="keyword-row"><span className="keyword-label">포함</span>{topic.includeKeywords.map((keyword) => <span className="keyword-chip" key={`in-${keyword}`}>{keyword}</span>)}</div>}
+                        {topic.excludeKeywords.length > 0 && <div className="keyword-row"><span className="keyword-label excluded">제외</span>{topic.excludeKeywords.map((keyword) => <span className="keyword-chip keyword-chip-muted" key={`out-${keyword}`}>{keyword}</span>)}</div>}
+                        {topic.includeKeywords.length === 0 && topic.excludeKeywords.length === 0 && <span className="keyword-hint">키워드 조건 없음</span>}
+                      </div>
+                      {run && (
+                        <div className="collection-status" aria-live="polite">
+                          <div>최근 수집 작업: {run.status} · {run.articlesFound}건</div>
+                          {run.errorMessage && (
+                            <div className="collection-error" role="status">
+                              수집 진단: {run.errorMessage}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {expandedTopicId === topic.id && (
+                        <div className="article-list" id={`articles-${topic.id}`}>
+                          <div className="article-list-heading">최근 수집 기사</div>
+                          {!articles || articles.length === 0 ? <p className="article-empty">저장된 기사가 없습니다. 뉴스 수집을 실행해 보세요.</p> : articles.map((article) => {
+                            const isScrapped = scraps.some((saved) => saved.id === article.id);
+                            return (
+                              <div className="article-item article-item-with-action" key={article.id}>
+                                <div className="article-item-content">
+                                  <a href={article.canonicalUrl} target="_blank" rel="noreferrer">{article.title}</a>
+                                  <div className="article-meta">{article.sourceName ?? "출처 미상"} · {formatDate(article.publishedAt)}</div>
+                                  {article.contentExcerpt && <p>{article.contentExcerpt}</p>}
+                                </div>
+                                <button type="button" className={`scrap-button ${isScrapped ? "is-scrapped" : ""}`} onClick={() => void handleToggleScrap(topic.id, article)}>
+                                  {isScrapped ? "★ 스크랩 해제" : "☆ 스크랩"}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div className="topic-actions topic-actions-column">
+                      <label className="collection-limit-control">
+                        수집 개수
+                        <select value={collectionLimit} onChange={(event) => setCollectionLimit(Number(event.target.value))} aria-label="수집할 뉴스 개수" disabled={collectingTopicId !== null}>
+                          {[5, 10, 15, 20, 30].map((count) => <option key={count} value={count}>{count}개</option>)}
+                        </select>
+                      </label>
+                      <button type="button" className="icon-button collect-button" onClick={() => void handleCollect(topic)} disabled={collectingTopicId !== null || status !== "online"}>{collectingTopicId === topic.id ? "수집 중…" : "뉴스 수집"}</button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        onClick={() => void loadArticles(topic.id)}
+                        aria-expanded={expandedTopicId === topic.id}
+                        aria-controls={`articles-${topic.id}`}
+                      >
+                        {expandedTopicId === topic.id ? "기사 접기" : "기사 보기"}
+                      </button>
+                      <button type="button" className="icon-button" onClick={() => startEdit(topic)}>수정</button>
+                      <button type="button" className="icon-button danger" onClick={() => void handleDelete(topic)}>삭제</button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <aside className="form-section" id="topic-form">
+          <div className="section-heading form-heading">
+            <div><div className="section-kicker">{editingId ? "EDIT TOPIC" : "NEW TOPIC"}</div><h2>{editingId ? "항목 수정" : "새 항목 추가"}</h2></div>
+            {editingId && <button type="button" className="text-button" onClick={resetForm}>취소</button>}
+          </div>
+          <form onSubmit={(event) => void handleSubmit(event)} className="topic-form">
+            <label className="field-label" htmlFor="topic-name">관심 주제 <span>*</span></label>
+            <input id="topic-name" className="text-input" type="text" maxLength={80} placeholder="예: OpenAI, NVIDIA, 게임 산업" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+            <label className="field-label" htmlFor="topic-description">설명 <span className="optional">선택</span></label>
+            <textarea id="topic-description" className="text-input textarea" maxLength={500} rows={3} placeholder="어떤 소식에 관심이 있는지 적어주세요." value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+            <label className="field-label" htmlFor="include-keywords">포함 키워드 <span className="optional">선택 · 쉼표로 구분</span></label>
+            <input id="include-keywords" className="text-input" type="text" placeholder="신제품, 실적, AI 모델" value={form.includeKeywords} onChange={(event) => setForm({ ...form, includeKeywords: event.target.value })} />
+            <label className="field-label" htmlFor="exclude-keywords">제외 키워드 <span className="optional">선택 · 쉼표로 구분</span></label>
+            <input id="exclude-keywords" className="text-input" type="text" placeholder="주가 전망, 광고" value={form.excludeKeywords} onChange={(event) => setForm({ ...form, excludeKeywords: event.target.value })} />
+            <p className="field-help">키워드는 각각 최대 20개까지 등록할 수 있어요.</p>
+            <button className="submit-button" type="submit" disabled={isSaving || status !== "online"}>{isSaving ? "저장 중…" : editingId ? "변경사항 저장" : "관심 항목 등록"}<span aria-hidden="true">→</span></button>
+          </form>
+          <div className="privacy-note"><span>⌑</span> 로그인한 계정별로 설정과 데이터가 분리되어 저장됩니다.</div>
+        </aside>
+      </section>
 
       <section className="scraps-section" id="archive" aria-labelledby="archive-title">
         <div className="section-heading archive-heading">
@@ -641,110 +736,9 @@ export default function App() {
         </div>
       </section>
 
-      <section className="workspace-grid">
-        <section className="topics-section" id="topics" aria-labelledby="topics-title">
-          <div className="section-heading">
-            <div><div className="section-kicker">YOUR TOPICS</div><h2 id="topics-title">관심 항목</h2></div>
-            <span className="count-badge">{topics.length}개</span>
-          </div>
+      <Newsletter userEmail={authUser?.email ?? ""} />
+      <Settings />
 
-          {isLoading ? (
-            <div className="empty-state"><div className="loading-spinner" /><p>관심 항목을 불러오는 중입니다.</p></div>
-          ) : topics.length === 0 ? (
-            <div className="empty-state"><div className="empty-symbol">✳</div><h3>아직 등록된 관심 항목이 없어요.</h3><p>오른쪽에서 첫 번째 관심 주제를 추가해 보세요.</p></div>
-          ) : (
-            <div className="topic-list">
-              {topics.map((topic) => {
-                const run = collectionRuns[topic.id];
-                const articles = articlesByTopic[topic.id];
-                return (
-                  <article className="topic-card" key={topic.id}>
-                    <div className="topic-card-main">
-                      <div className="topic-card-title-row"><h3>{topic.name}</h3><span className="topic-date">{formatDate(topic.createdAt)}</span></div>
-                      {topic.description && <p className="topic-description">{topic.description}</p>}
-                      <div className="keyword-groups">
-                        {topic.includeKeywords.length > 0 && <div className="keyword-row"><span className="keyword-label">포함</span>{topic.includeKeywords.map((keyword) => <span className="keyword-chip" key={`in-${keyword}`}>{keyword}</span>)}</div>}
-                        {topic.excludeKeywords.length > 0 && <div className="keyword-row"><span className="keyword-label excluded">제외</span>{topic.excludeKeywords.map((keyword) => <span className="keyword-chip keyword-chip-muted" key={`out-${keyword}`}>{keyword}</span>)}</div>}
-                        {topic.includeKeywords.length === 0 && topic.excludeKeywords.length === 0 && <span className="keyword-hint">키워드 조건 없음</span>}
-                      </div>
-                      {run && (
-                        <div className="collection-status" aria-live="polite">
-                          <div>최근 수집 작업: {run.status} · {run.articlesFound}건</div>
-                          {run.errorMessage && (
-                            <div className="collection-error" role="status">
-                              수집 진단: {run.errorMessage}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {expandedTopicId === topic.id && (
-                        <div className="article-list" id={`articles-${topic.id}`}>
-                          <div className="article-list-heading">최근 수집 기사</div>
-                          {!articles || articles.length === 0 ? <p className="article-empty">저장된 기사가 없습니다. 뉴스 수집을 실행해 보세요.</p> : articles.map((article) => {
-                            const isScrapped = scraps.some((saved) => saved.id === article.id);
-                            return (
-                              <div className="article-item article-item-with-action" key={article.id}>
-                                <div className="article-item-content">
-                                  <a href={article.canonicalUrl} target="_blank" rel="noreferrer">{article.title}</a>
-                                  <div className="article-meta">{article.sourceName ?? "출처 미상"} · {formatDate(article.publishedAt)}</div>
-                                  {article.contentExcerpt && <p>{article.contentExcerpt}</p>}
-                                </div>
-                                <button type="button" className={`scrap-button ${isScrapped ? "is-scrapped" : ""}`} onClick={() => void handleToggleScrap(topic.id, article)}>
-                                  {isScrapped ? "★ 스크랩 해제" : "☆ 스크랩"}
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                    <div className="topic-actions topic-actions-column">
-                      <label className="collection-limit-control">
-                        수집 개수
-                        <select value={collectionLimit} onChange={(event) => setCollectionLimit(Number(event.target.value))} aria-label="수집할 뉴스 개수" disabled={collectingTopicId !== null}>
-                          {[5, 10, 15, 20, 30].map((count) => <option key={count} value={count}>{count}개</option>)}
-                        </select>
-                      </label>
-                      <button type="button" className="icon-button collect-button" onClick={() => void handleCollect(topic)} disabled={collectingTopicId !== null || status !== "online"}>{collectingTopicId === topic.id ? "수집 중…" : "뉴스 수집"}</button>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        onClick={() => void loadArticles(topic.id)}
-                        aria-expanded={expandedTopicId === topic.id}
-                        aria-controls={`articles-${topic.id}`}
-                      >
-                        {expandedTopicId === topic.id ? "기사 접기" : "기사 보기"}
-                      </button>
-                      <button type="button" className="icon-button" onClick={() => startEdit(topic)}>수정</button>
-                      <button type="button" className="icon-button danger" onClick={() => void handleDelete(topic)}>삭제</button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <aside className="form-section" id="topic-form">
-          <div className="section-heading form-heading">
-            <div><div className="section-kicker">{editingId ? "EDIT TOPIC" : "NEW TOPIC"}</div><h2>{editingId ? "항목 수정" : "새 항목 추가"}</h2></div>
-            {editingId && <button type="button" className="text-button" onClick={resetForm}>취소</button>}
-          </div>
-          <form onSubmit={(event) => void handleSubmit(event)} className="topic-form">
-            <label className="field-label" htmlFor="topic-name">관심 주제 <span>*</span></label>
-            <input id="topic-name" className="text-input" type="text" maxLength={80} placeholder="예: OpenAI, NVIDIA, 게임 산업" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
-            <label className="field-label" htmlFor="topic-description">설명 <span className="optional">선택</span></label>
-            <textarea id="topic-description" className="text-input textarea" maxLength={500} rows={3} placeholder="어떤 소식에 관심이 있는지 적어주세요." value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
-            <label className="field-label" htmlFor="include-keywords">포함 키워드 <span className="optional">선택 · 쉼표로 구분</span></label>
-            <input id="include-keywords" className="text-input" type="text" placeholder="신제품, 실적, AI 모델" value={form.includeKeywords} onChange={(event) => setForm({ ...form, includeKeywords: event.target.value })} />
-            <label className="field-label" htmlFor="exclude-keywords">제외 키워드 <span className="optional">선택 · 쉼표로 구분</span></label>
-            <input id="exclude-keywords" className="text-input" type="text" placeholder="주가 전망, 광고" value={form.excludeKeywords} onChange={(event) => setForm({ ...form, excludeKeywords: event.target.value })} />
-            <p className="field-help">키워드는 각각 최대 20개까지 등록할 수 있어요.</p>
-            <button className="submit-button" type="submit" disabled={isSaving || status !== "online"}>{isSaving ? "저장 중…" : editingId ? "변경사항 저장" : "관심 항목 등록"}<span aria-hidden="true">→</span></button>
-          </form>
-          <div className="privacy-note"><span>⌑</span> 로그인한 계정별로 설정과 데이터가 분리되어 저장됩니다.</div>
-        </aside>
-      </section>
       <footer className="footer"><span>News for Me</span><span>YOUR PERSONAL AI NEWS BRIEFING</span></footer>
     </main>
   );
