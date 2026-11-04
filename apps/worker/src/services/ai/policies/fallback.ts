@@ -1,7 +1,7 @@
 ﻿import type { AIEnvironment, ArticleSummaryOutput } from "../types";
 import { AIProviderError } from "../types";
 import { callGemini } from "../providers/gemini";
-import { GeminiModelCatalogError, listGeminiModels, resolveGeminiModelOrder } from "../gemini-models";
+import { GeminiModelCatalogError, listGeminiModels, resolveGeminiModelOrder, type GeminiModelOption } from "../gemini-models";
 import { callOpenRouter } from "../providers/openrouter";
 
 export interface RoutedSummaryResult {
@@ -115,7 +115,7 @@ export async function routeSummaryRequest(
     if (key.slot === "gemini-key-2" && skipKey2AfterQuota) continue;
     if (invalidKeys.has(key.slot)) continue;
 
-    let availableModels = [];
+    let availableModels: GeminiModelOption[] = [];
     try {
       availableModels = await listGeminiModels(key.key);
     } catch (error) {
