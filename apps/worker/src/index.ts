@@ -29,6 +29,7 @@ interface Env extends AIEnvironment, GmailEnvironment {
   AUTH_MIGRATION_TOKEN?: string;
   YOUTUBE_API_KEY?: string;
   X_BEARER_TOKEN?: string;
+  THREADS_ACCESS_TOKEN?: string;
 }
 
 export default {
