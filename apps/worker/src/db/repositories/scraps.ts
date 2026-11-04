@@ -106,9 +106,8 @@ export async function saveArticleForUser(
     SELECT ?, a.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
     FROM articles a
     INNER JOIN topic_articles ta ON ta.article_id = a.id
-    INNER JOIN topics t ON t.id = ta.topic_id
-    WHERE a.id = ? AND ta.topic_id = ? AND t.user_id = ?
-  `).bind(userId, articleId, topicId, userId).run();
+    WHERE a.id = ? AND ta.topic_id = ?
+  `).bind(userId, articleId, topicId).run();
 
   const row = await db.prepare(`
     SELECT a.id, a.title, a.canonical_url, a.source_name,

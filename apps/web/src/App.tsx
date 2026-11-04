@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type {
   ApiHealthResponse, CollectionRun, NewsArticle, SavedNewsArticle,
-  SavedNewsTag, Topic, TopicInput
+  SavedNewsTag, Topic, TopicInput, TopicListResponse
 } from "@news-for-me/shared";
 import {
   collectTopic, createTopic, deleteTopic, getApiHealth, getCollectionRun, getCurrentUser,
@@ -53,6 +53,9 @@ export default function App() {
   const [authUser, setAuthUser] = useState<{ id: string; email: string; name: string; isDevelopment: boolean } | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [topics, setTopics] = useState<Topic[]>([]);
+  const [topicPagination, setTopicPagination] = useState<TopicListResponse["pagination"]>({
+    page:1,limit:5,totalItems:0,totalPages:1,ownedCount:0
+  });
   const [articlesByTopic, setArticlesByTopic] = useState<Record<string, NewsArticle[]>>({});
   const [scraps, setScraps] = useState<SavedNewsArticle[]>([]);
   const [tags, setTags] = useState<SavedNewsTag[]>([]);
@@ -86,6 +89,7 @@ export default function App() {
         setStatus("online");
         setHealth(null);
         setTopics([]);
+        setTopicPagination({page:1,limit:5,totalItems:0,totalPages:1,ownedCount:0});
         setScraps([]);
         setTags([]);
         return;
@@ -95,11 +99,12 @@ export default function App() {
       setAuthStatus("signed-in");
 
       const [apiHealth, topicList, savedArticles, userTags] = await Promise.all([
-        getApiHealth(), listTopics(), listScraps(), listTags()
+        getApiHealth(), listTopics(1,5), listScraps(), listTags()
       ]);
       setHealth(apiHealth);
       setStatus("online");
-      setTopics(topicList);
+      setTopics(topicList.data);
+      setTopicPagination(topicList.pagination);
       setScraps(savedArticles);
       setTags(userTags);
     } catch (err) {
@@ -135,6 +140,12 @@ export default function App() {
     }
   }
 
+  async function loadTopicPage(page:number) {
+    const result=await listTopics(page,5);
+    setTopics(result.data);
+    setTopicPagination(result.pagination);
+    setExpandedTopicId(null);
+  }
   function resetForm() {
     setForm(EMPTY_FORM);
     setEditingId(null);
@@ -179,10 +190,11 @@ export default function App() {
     try {
       await deleteTopic(topic.id);
       if (editingId === topic.id) resetForm();
-      setTopics((current) => current.filter((item) => item.id !== topic.id));
       setArticlesByTopic((current) => {
         const next = { ...current }; delete next[topic.id]; return next;
       });
+      const nextPage=topicPagination.page>1 && topics.length===1 ? topicPagination.page-1 : topicPagination.page;
+      await loadTopicPage(nextPage);
       setNotice(`'${topic.name}' 항목을 삭제했어요.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "삭제에 실패했습니다.");
@@ -349,7 +361,9 @@ export default function App() {
           const articles = await listTopicArticles(topic.id);
           setArticlesByTopic((current) => ({ ...current, [topic.id]: articles }));
           setExpandedTopicId(topic.id);
-          setTopics(await listTopics());
+          const refreshedTopics = await listTopics(topicPagination.page, 5);
+          setTopics(refreshedTopics.data);
+          setTopicPagination(refreshedTopics.pagination);
           if (run.articlesFound === 0) {
             console.warn("[NewsForMe][Collection] completed with zero articles", {
               runId, topicId: topic.id, topicName: topic.name
@@ -511,8 +525,9 @@ export default function App() {
           <div className="section-heading topics-heading">
             <div><div className="section-kicker">YOUR TOPICS</div><h2 id="topics-title">관심 주제와 최신 뉴스</h2></div>
             <div className="section-heading-actions">
-              <span className="count-badge">{topics.length}개 주제</span>
-              <a className="section-action-link" href="#topic-form">주제 추가 <span aria-hidden="true">＋</span></a>
+              <span className="count-badge">{topicPagination.totalItems}개 공개 주제</span>
+              <span className="count-badge">내 주제 {topicPagination.ownedCount}/3</span>
+              {topicPagination.ownedCount<3 && <a className="section-action-link" href="#topic-form">주제 추가 <span aria-hidden="true">＋</span></a>}
             </div>
           </div>
 
@@ -529,6 +544,7 @@ export default function App() {
                   <article className="topic-card" key={topic.id}>
                     <div className="topic-card-main">
                       <div className="topic-card-title-row"><h3>{topic.name}</h3><span className="topic-date">{formatDate(topic.createdAt)}</span></div>
+                    <div className="topic-creator">작성자 · {topic.createdByName}</div>
                       {topic.description && <p className="topic-description">{topic.description}</p>}
                       <div className="keyword-groups">
                         {topic.includeKeywords.length > 0 && <div className="keyword-row"><span className="keyword-label">포함</span>{topic.includeKeywords.map((keyword) => <span className="keyword-chip" key={`in-${keyword}`}>{keyword}</span>)}</div>}
@@ -583,14 +599,21 @@ export default function App() {
                       >
                         {expandedTopicId === topic.id ? "기사 접기" : "기사 보기"}
                       </button>
-                      <button type="button" className="icon-button" onClick={() => startEdit(topic)}>수정</button>
-                      <button type="button" className="icon-button danger" onClick={() => void handleDelete(topic)}>삭제</button>
+                      {topic.isOwner && <>
+                        <button type="button" className="icon-button" onClick={() => startEdit(topic)}>수정</button>
+                        <button type="button" className="icon-button danger" onClick={() => void handleDelete(topic)}>삭제</button>
+                      </>}
                     </div>
                   </article>
                 );
               })}
             </div>
           )}
+          {topicPagination.totalPages>1 && <nav className="topic-pagination" aria-label="주제 목록 페이지">
+            <button type="button" onClick={()=>void loadTopicPage(topicPagination.page-1)} disabled={topicPagination.page<=1}>이전</button>
+            <span>{topicPagination.page} / {topicPagination.totalPages}</span>
+            <button type="button" onClick={()=>void loadTopicPage(topicPagination.page+1)} disabled={topicPagination.page>=topicPagination.totalPages}>다음</button>
+          </nav>}
         </section>
 
         <aside className="form-section" id="topic-form">
@@ -608,7 +631,10 @@ export default function App() {
             <label className="field-label" htmlFor="exclude-keywords">제외 키워드 <span className="optional">선택 · 쉼표로 구분</span></label>
             <input id="exclude-keywords" className="text-input" type="text" placeholder="주가 전망, 광고" value={form.excludeKeywords} onChange={(event) => setForm({ ...form, excludeKeywords: event.target.value })} />
             <p className="field-help">키워드는 각각 최대 20개까지 등록할 수 있어요.</p>
-            <button className="submit-button" type="submit" disabled={isSaving || status !== "online"}>{isSaving ? "저장 중…" : editingId ? "변경사항 저장" : "관심 항목 등록"}<span aria-hidden="true">→</span></button>
+            {!editingId && topicPagination.ownedCount>=3 && <p className="field-help" role="status">계정당 관심 주제는 최대 3개까지 만들 수 있어요.</p>}
+            <button className="submit-button" type="submit" disabled={isSaving || status!=="online" || (!editingId && topicPagination.ownedCount>=3)}>
+              {isSaving?"저장 중…":editingId?"변경사항 저장":"관심 항목 등록"}<span aria-hidden="true">→</span>
+            </button>
           </form>
           <div className="privacy-note"><span>⌑</span> 로그인한 계정별로 설정과 데이터가 분리되어 저장됩니다.</div>
         </aside>

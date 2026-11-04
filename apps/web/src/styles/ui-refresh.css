@@ -1982,3 +1982,10 @@ button:not(:disabled) {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+.topic-creator{color:var(--muted,#64748b);font-size:.78rem;margin-top:.35rem}
+.topic-pagination{display:flex;align-items:center;justify-content:center;gap:.8rem;padding:1rem 0 .25rem}
+.topic-pagination button{border:1px solid var(--line,#dbe3dc);border-radius:999px;background:var(--surface,#fff);color:inherit;padding:.45rem .9rem;cursor:pointer}
+.topic-pagination button:disabled{opacity:.4;cursor:not-allowed}
+.topic-pagination span{color:var(--muted,#64748b);font-size:.85rem;font-variant-numeric:tabular-nums}

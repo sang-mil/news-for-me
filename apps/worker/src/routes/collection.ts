@@ -33,7 +33,7 @@ export async function handleCollectionRequest(
     return jsonResponse({ error: "Invalid topic ID." }, 400, allowedOrigin);
   }
 
-  const topic = await getTopicForCollection(db, userId, topicId);
+  const topic = await getTopicForCollection(db, topicId);
   if (!topic) {
     return jsonResponse({ error: "Topic not found or inactive." }, 404, allowedOrigin);
   }
@@ -76,7 +76,7 @@ export async function handleCollectionRequest(
     const limit = Number.isFinite(requestedLimit)
       ? Math.min(50, Math.max(1, Math.floor(requestedLimit)))
       : 20;
-    const articles = await listTopicArticles(db, userId, topicId, limit);
+    const articles = await listTopicArticles(db, topicId, limit);
     return jsonResponse({ data: articles }, 200, allowedOrigin);
   }
 
@@ -87,7 +87,7 @@ export async function handleCollectionRequest(
     } catch {
       return jsonResponse({ error: "Invalid collection run ID." }, 400, allowedOrigin);
     }
-    const run = await getCollectionRun(db, userId, topicId, runId);
+    const run = await getCollectionRun(db, topicId, runId);
     return run
       ? jsonResponse({ data: run }, 200, allowedOrigin)
       : jsonResponse({ error: "Collection run not found." }, 404, allowedOrigin);

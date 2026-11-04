@@ -139,8 +139,17 @@ export async function handleTopicsRequest(
   }
 
   if (collectionPath && request.method === "GET") {
-    const topics = await listTopics(db, userId);
-    return jsonResponse({ data: topics }, 200, allowedOrigin);
+    const rawPage=Number(url.searchParams.get("page")??"1");
+    const rawLimit=Number(url.searchParams.get("limit")??"5");
+    const page=Number.isFinite(rawPage)?Math.max(1,Math.floor(rawPage)):1;
+    const limit=Number.isFinite(rawLimit)?Math.min(20,Math.max(1,Math.floor(rawLimit))):5;
+    const result=await listTopics(db,userId,page,limit);
+    const totalPages=Math.max(1,Math.ceil(result.totalCount/limit));
+    const safePage=Math.min(page,totalPages);
+    const current=safePage===page?result:await listTopics(db,userId,safePage,limit);
+    return jsonResponse({data:current.topics,pagination:{
+      page:safePage,limit,totalItems:current.totalCount,totalPages,ownedCount:current.ownedCount
+    }},200,allowedOrigin);
   }
 
   if (collectionPath && request.method === "POST") {
@@ -162,6 +171,9 @@ export async function handleTopicsRequest(
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         return jsonResponse({ error: "A topic with this name already exists." }, 409, allowedOrigin);
+      }
+      if (error instanceof Error && error.message.includes("TOPIC_LIMIT_REACHED")) {
+        return jsonResponse({ error: "계정당 관심 주제는 최대 3개까지 만들 수 있습니다.", code: "TOPIC_LIMIT_REACHED" }, 409, allowedOrigin);
       }
       throw error;
     }

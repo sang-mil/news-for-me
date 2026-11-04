@@ -49,16 +49,15 @@ function toCollectionRun(row: CollectionRunRow): CollectionRun {
 
 export async function getTopicForCollection(
   db: D1Database,
-  userId: string,
   topicId: string
 ): Promise<TopicForCollection | null> {
   return db.prepare(`
     SELECT id, user_id, name, description,
       include_keywords_json, exclude_keywords_json
     FROM topics
-    WHERE id = ? AND user_id = ? AND is_active = 1
+    WHERE id = ? AND is_active = 1
     LIMIT 1
-  `).bind(topicId, userId).first<TopicForCollection>();
+  `).bind(topicId).first<TopicForCollection>();
 }
 
 export async function createCollectionRun(
@@ -75,7 +74,6 @@ export async function createCollectionRun(
 
 export async function getCollectionRun(
   db: D1Database,
-  userId: string,
   topicId: string,
   runId: string
 ): Promise<CollectionRun | null> {
@@ -84,15 +82,14 @@ export async function getCollectionRun(
       cr.error_message, cr.started_at, cr.finished_at, cr.created_at
     FROM collection_runs cr
     INNER JOIN topics t ON t.id = cr.topic_id
-    WHERE cr.id = ? AND cr.topic_id = ? AND t.user_id = ?
+    WHERE cr.id = ? AND cr.topic_id = ?
     LIMIT 1
-  `).bind(runId, topicId, userId).first<CollectionRunRow>();
+  `).bind(runId, topicId).first<CollectionRunRow>();
   return row ? toCollectionRun(row) : null;
 }
 
 export async function listTopicArticles(
   db: D1Database,
-  userId: string,
   topicId: string,
   limit = 20
 ): Promise<NewsArticle[]> {
@@ -104,10 +101,10 @@ export async function listTopicArticles(
     FROM articles a
     INNER JOIN topic_articles ta ON ta.article_id = a.id
     INNER JOIN topics t ON t.id = ta.topic_id
-    WHERE ta.topic_id = ? AND t.user_id = ?
+    WHERE ta.topic_id = ?
     ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
     LIMIT ?
-  `).bind(topicId, userId, limit).all<ArticleRow>();
+  `).bind(topicId, limit).all<ArticleRow>();
 
   return result.results.map((row) => ({
     id: row.id,
@@ -195,8 +192,8 @@ export async function storeCollectedArticles(
     UPDATE topics
     SET last_collected_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
       updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-    WHERE id = ? AND user_id = ?
-  `).bind(job.topicId, job.userId));
+    WHERE id = ?
+  `).bind(job.topicId));
 
   await db.batch(statements);
   return stored;

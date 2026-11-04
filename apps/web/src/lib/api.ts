@@ -55,9 +55,8 @@ export async function getCurrentUser(): Promise<CurrentUserResponse> {
 export async function getApiHealth(): Promise<ApiHealthResponse> {
   return request<ApiHealthResponse>("/api/health");
 }
-export async function listTopics(): Promise<Topic[]> {
-  const response = await request<TopicListResponse>("/api/topics");
-  return response.data;
+export async function listTopics(page=1,limit=5): Promise<TopicListResponse> {
+  return request<TopicListResponse>(`/api/topics?page=${page}&limit=${limit}`);
 }
 export async function createTopic(input: TopicInput): Promise<Topic> {
   const response = await request<TopicResponse>("/api/topics", { method: "POST", body: JSON.stringify(input) });
