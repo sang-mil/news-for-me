@@ -4,7 +4,7 @@
 
 The settings API reads the models available to the current user's Gemini API key
 from `GET /v1beta/models` and keeps models that support `generateContent`.
-Only text-oriented Gemini models are offered for news summaries.
+Text-oriented Gemini and Gemma models that support generateContent are offered for news summaries.
 
 The selected model is a priority, not an exclusive model lock:
 1. Try the selected model first.
