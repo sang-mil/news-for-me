@@ -38,7 +38,7 @@ Write-Host ""
 $startConfirmation = Read-Host "계속하려면 DEPLOY-WORKER 입력"
 if ($startConfirmation -cne "DEPLOY-WORKER") {
     Write-Host "취소했습니다. 원격 D1과 Worker는 변경되지 않았습니다." -ForegroundColor Yellow
-    exit 0
+    return
 }
 
 $backupDirectory = Join-Path $repositoryRoot ".local-backups"
