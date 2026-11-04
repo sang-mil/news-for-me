@@ -15,6 +15,12 @@ export function validateNewsletterScheduledAt(
     return { ok: false, error: "예약 시간은 시간대가 포함된 ISO 날짜여야 합니다." };
   }
 
+  const calendarDate = value.slice(0, 10);
+  const calendarCheck = new Date(`${calendarDate}T00:00:00.000Z`);
+  if (Number.isNaN(calendarCheck.getTime()) || calendarCheck.toISOString().slice(0, 10) !== calendarDate) {
+    return { ok: false, error: "예약 날짜와 시간을 올바르게 입력하세요." };
+  }
+
   const timestamp = Date.parse(value);
   if (!Number.isFinite(timestamp)) {
     return { ok: false, error: "예약 날짜와 시간을 올바르게 입력하세요." };
