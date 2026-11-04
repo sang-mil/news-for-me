@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import {
   decryptIntegrationCredentials,
-  encryptIntegrationCredentials
+  encryptIntegrationCredentials,
+  isMissingUserIntegrationsTableError
 } from "../../apps/worker/src/services/integrations.ts";
 
 function makeKey() {
@@ -59,4 +60,19 @@ test("ciphertext is bound to its user and provider context", async () => {
   );
   await assert.rejects(() => decryptIntegrationCredentials(encrypted, key, "user-b:threads"));
   await assert.rejects(() => decryptIntegrationCredentials(encrypted, key, "user-a:x"));
+});
+
+test("missing user integrations schema error is recognized", () => {
+  assert.equal(
+    isMissingUserIntegrationsTableError(new Error("D1_ERROR: no such table: user_integrations: SQLITE_ERROR")),
+    true
+  );
+  assert.equal(
+    isMissingUserIntegrationsTableError(new Error("no such table: topics")),
+    false
+  );
+  assert.equal(
+    isMissingUserIntegrationsTableError(new Error("UNIQUE constraint failed")),
+    false
+  );
 });
