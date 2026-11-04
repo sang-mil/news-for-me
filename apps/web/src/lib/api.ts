@@ -206,10 +206,10 @@ export async function getNewsletterPreview(): Promise<NewsletterPreview> {
   const response = await request<{ data: NewsletterPreview }>("/api/newsletter/preview");
   return response.data;
 }
-export async function sendNewsletterNow(): Promise<NewsletterSendResult> {
+export async function sendNewsletterNow(recipient: string): Promise<NewsletterSendResult> {
   const response = await request<{ data: NewsletterSendResult }>("/api/newsletter/send-test", {
     method: "POST",
-    body: JSON.stringify({ confirm: true })
+    body: JSON.stringify({ confirm: true, recipient })
   });
   return response.data;
 }
