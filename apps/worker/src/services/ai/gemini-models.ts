@@ -46,6 +46,12 @@ export const FREE_TIER_GEMINI_MODEL_IDS = [
 ] as const;
 
 const FREE_MODEL_SET = new Set<string>(FREE_TIER_GEMINI_MODEL_IDS);
+
+function isFreeTierModel(id: string): boolean {
+  // Google currently lists Gemma 4 as free of charge on the Gemini API pricing page.
+  return FREE_MODEL_SET.has(id) || /^gemma-4-/i.test(id);
+}
+
 const EXCLUDED_MODEL_PATTERN = /(embedding|tts|image|audio|live|transcri|veo|imagen|lyria|robotics|computer-use)/i;
 const MODEL_CATALOG_TTL_MS = 15 * 60 * 1000;
 const modelCatalogCache = new Map<string, { expiresAt: number; models: GeminiModelOption[] }>();
@@ -73,7 +79,7 @@ export function parseGeminiModelCatalog(value: unknown): GeminiModelOption[] {
     if (typeof item.name !== "string") continue;
 
     const id = item.name.replace(/^models\//, "").trim();
-    if (!/^gemini-[a-z0-9][a-z0-9._-]*$/i.test(id)) continue;
+    if (!/^(gemini|gemma)-[a-z0-9][a-z0-9._-]*$/i.test(id)) continue;
     if (EXCLUDED_MODEL_PATTERN.test(id)) continue;
     if (!Array.isArray(item.supportedGenerationMethods) ||
         !item.supportedGenerationMethods.includes("generateContent")) continue;
@@ -83,7 +89,7 @@ export function parseGeminiModelCatalog(value: unknown): GeminiModelOption[] {
       displayName: typeof item.displayName === "string" && item.displayName.trim()
         ? item.displayName.trim()
         : id,
-      isFreeTier: FREE_MODEL_SET.has(id),
+      isFreeTier: isFreeTierModel(id),
       ...(positiveInteger(item.inputTokenLimit) ? { inputTokenLimit: positiveInteger(item.inputTokenLimit) } : {}),
       ...(positiveInteger(item.outputTokenLimit) ? { outputTokenLimit: positiveInteger(item.outputTokenLimit) } : {})
     });
