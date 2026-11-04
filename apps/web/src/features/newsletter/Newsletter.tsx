@@ -10,7 +10,7 @@ interface NewsletterProps {
   userEmail: string;
 }
 
-const EMAIL_RE = /^[^\\s@,;]+@[^\\s@,;]+\\.[^\\s@,;]+$/;
+const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -93,6 +93,7 @@ export default function Newsletter({ userEmail }: NewsletterProps) {
             autoComplete="email"
             inputMode="email"
             maxLength={254}
+            required
             value={recipientEmail}
             onChange={(event) => setRecipientEmail(event.target.value)}
             placeholder="recipient@example.com"
