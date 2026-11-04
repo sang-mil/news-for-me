@@ -100,3 +100,44 @@ jobs:
         working-directory: apps/web
         # Wrangler automatically loads ./wrangler.jsonc from the working directory.
         run: npx wrangler pages deploy dist --project-name news-for-me --branch main --commit-hash "$GITHUB_SHA"
+
+      - name: Verify production API and D1 health
+        env:
+          HEALTH_URL: https://news-for-me.pages.dev/api/health
+        run: |
+          node --input-type=module <<'NODE'
+          const url = process.env.HEALTH_URL;
+          let lastError = "No response";
+
+          for (let attempt = 1; attempt <= 6; attempt += 1) {
+            try {
+              const response = await fetch(url, {
+                headers: { accept: "application/json" },
+                signal: AbortSignal.timeout(10000)
+              });
+              const body = await response.json().catch(() => null);
+
+              if (
+                response.ok &&
+                body?.ok === true &&
+                body?.service === "news-for-me-api" &&
+                body?.database === "connected"
+              ) {
+                console.log("Production API health check passed:", JSON.stringify(body));
+                process.exit(0);
+              }
+
+              lastError = `HTTP ${response.status}; body=${JSON.stringify(body)}`;
+            } catch (error) {
+              lastError = error instanceof Error ? error.message : String(error);
+            }
+
+            console.warn(`Health check attempt ${attempt}/6 failed: ${lastError}`);
+            if (attempt < 6) {
+              await new Promise((resolve) => setTimeout(resolve, 5000));
+            }
+          }
+
+          console.error(`Production API health check failed after 6 attempts: ${lastError}`);
+          process.exit(1);
+          NODE
