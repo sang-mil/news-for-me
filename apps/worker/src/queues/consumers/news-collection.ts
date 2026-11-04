@@ -14,8 +14,9 @@ import { isSoftwareOrTechTopic } from "../../services/news/relevance";
 import { summarizeCollectedArticles } from "../../services/ai/summarizer";
 import type { AIEnvironment } from "../../services/ai/types";
 import type { CollectionJobMessage, NewsSource } from "../../services/news/types";
+import { getUserIntegration, type IntegrationProvider } from "../../services/integrations";
 
-interface CollectionConsumerEnv extends AIEnvironment { DB: D1Database; YOUTUBE_API_KEY?: string; X_BEARER_TOKEN?: string; THREADS_ACCESS_TOKEN?: string; }
+interface CollectionConsumerEnv extends AIEnvironment { DB: D1Database; INTEGRATION_ENCRYPTION_KEY?: string; YOUTUBE_API_KEY?: string; X_BEARER_TOKEN?: string; THREADS_ACCESS_TOKEN?: string; }
 
 function parseKeywords(value: string): string[] {
   try {
@@ -24,6 +25,31 @@ function parseKeywords(value: string): string[] {
   } catch { return []; }
 }
 
+async function loadIntegration(
+  db: D1Database,
+  userId: string,
+  provider: IntegrationProvider,
+  encryptionKey?: string
+) {
+  const exists = await db.prepare(
+    "SELECT 1 AS found FROM user_integrations WHERE user_id = ? AND provider = ? LIMIT 1"
+  ).bind(userId, provider).first<{ found: number }>();
+  if (!exists) return null;
+  if (!encryptionKey?.trim()) {
+    throw new Error("INTEGRATION_ENCRYPTION_KEY is required to read saved user integrations.");
+  }
+  return getUserIntegration(db, userId, provider, encryptionKey);
+}
+
+function useSavedSecret(
+  saved: Awaited<ReturnType<typeof loadIntegration>>,
+  fallback: string | undefined
+): string | undefined {
+  if (saved) return saved.config.enabled === false ? undefined : saved.credentials.secret;
+  return fallback?.trim() || undefined;
+}
+
+
 async function processCollectionJob(job: CollectionJobMessage, env: CollectionConsumerEnv): Promise<void> {
   await markCollectionStarted(env.DB, job.runId);
   const topic = await getTopicForCollection(env.DB, job.userId, job.topicId);
@@ -31,6 +57,33 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
 
   const maxArticles = Math.min(30, Math.max(5, Math.floor(job.maxArticles ?? 10)));
   const searchInput = { topicName: topic.name, includeKeywords: parseKeywords(topic.include_keywords_json), excludeKeywords: parseKeywords(topic.exclude_keywords_json), maxResults: maxArticles };
+
+  const [geminiIntegration, openRouterIntegration, youtubeIntegration, xIntegration, threadsIntegration] = await Promise.all([
+    loadIntegration(env.DB, job.userId, "gemini", env.INTEGRATION_ENCRYPTION_KEY),
+    loadIntegration(env.DB, job.userId, "openrouter", env.INTEGRATION_ENCRYPTION_KEY),
+    loadIntegration(env.DB, job.userId, "youtube", env.INTEGRATION_ENCRYPTION_KEY),
+    loadIntegration(env.DB, job.userId, "x", env.INTEGRATION_ENCRYPTION_KEY),
+    loadIntegration(env.DB, job.userId, "threads", env.INTEGRATION_ENCRYPTION_KEY)
+  ]);
+
+  const aiEnvironment: AIEnvironment = {
+    ...env,
+    GEMINI_API_KEY_1: useSavedSecret(geminiIntegration, env.GEMINI_API_KEY_1),
+    GEMINI_API_KEY_2: geminiIntegration ? undefined : env.GEMINI_API_KEY_2,
+    GEMINI_PROJECT_SLOT_1: geminiIntegration?.config.projectSlot ?? env.GEMINI_PROJECT_SLOT_1,
+    GEMINI_PROJECT_SLOT_2: geminiIntegration ? undefined : env.GEMINI_PROJECT_SLOT_2,
+    GEMINI_MODEL_PRIMARY: geminiIntegration?.config.modelPrimary ?? env.GEMINI_MODEL_PRIMARY,
+    GEMINI_MODEL_FALLBACK: geminiIntegration?.config.modelFallback ?? env.GEMINI_MODEL_FALLBACK,
+    OPENROUTER_API_KEY: useSavedSecret(openRouterIntegration, env.OPENROUTER_API_KEY),
+    OPENROUTER_MODEL: openRouterIntegration?.config.model ?? env.OPENROUTER_MODEL,
+    OPENROUTER_ALLOW_PAID: openRouterIntegration
+      ? (openRouterIntegration.config.allowPaid === true ? "true" : "false")
+      : env.OPENROUTER_ALLOW_PAID
+  };
+
+  const youtubeApiKey = useSavedSecret(youtubeIntegration, env.YOUTUBE_API_KEY);
+  const xBearerToken = useSavedSecret(xIntegration, env.X_BEARER_TOKEN);
+  const threadsAccessToken = useSavedSecret(threadsIntegration, env.THREADS_ACCESS_TOKEN);
   const sources: NewsSource[] = [
     googleNewsRssSource,
     { id: "bing-news-rss", contentType: "article", search: async (input) => (await searchBingNewsRss(input)).items }
@@ -47,21 +100,21 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
     skippedSources.push("github-search (not a software/technology topic)", "v2ex-public-api (not a software/technology topic)");
   }
 
-  if (env.YOUTUBE_API_KEY?.trim()) {
-    sources.push(createYouTubeVideosSource(env.YOUTUBE_API_KEY.trim()));
+  if (youtubeApiKey) {
+    sources.push(createYouTubeVideosSource(youtubeApiKey));
   } else {
     skippedSources.push("youtube-data-api (missing YOUTUBE_API_KEY)");
     console.warn("[NewsForMe][YouTube] source skipped: YOUTUBE_API_KEY is not available in this Worker deployment");
   }
 
-  if (env.X_BEARER_TOKEN?.trim()) {
-    sources.push(createXPostsSource(env.X_BEARER_TOKEN.trim()));
+  if (xBearerToken) {
+    sources.push(createXPostsSource(xBearerToken));
   } else {
     skippedSources.push("x-api (missing X_BEARER_TOKEN)");
   }
 
-  if (env.THREADS_ACCESS_TOKEN?.trim()) {
-    sources.push(createThreadsPostsSource(env.THREADS_ACCESS_TOKEN.trim()));
+  if (threadsAccessToken) {
+    sources.push(createThreadsPostsSource(threadsAccessToken));
   } else {
     skippedSources.push("threads-api (missing THREADS_ACCESS_TOKEN)");
   }
@@ -76,7 +129,7 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
   ].filter(Boolean).join(" ");
 
   const storedArticles = await storeCollectedArticles(env.DB, job, collection.items, collectionNote);
-  const result = await summarizeCollectedArticles(env.DB, job.runId, job.topicId, storedArticles, env);
+  const result = await summarizeCollectedArticles(env.DB, job.runId, job.topicId, storedArticles, aiEnvironment);
   console.log("News collection pipeline completed", job.runId, "items:", storedArticles.length, "sources:", sourceSummary, "summarized:", result.summarized, "skipped:", result.skipped);
 }
 

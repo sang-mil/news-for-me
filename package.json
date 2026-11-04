@@ -15,7 +15,8 @@
     "dev:api": "npm run dev --workspace @news-for-me/worker",
     "build": "npm run build --workspace @news-for-me/web",
     "typecheck:web": "npm run typecheck --workspace @news-for-me/web",
-    "typecheck:api": "npm run typecheck --workspace @news-for-me/worker"
+    "typecheck:api": "npm run typecheck --workspace @news-for-me/worker",
+    "test:unit": "node --experimental-strip-types --test tests/unit/*.test.mjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.6",

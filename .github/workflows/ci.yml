@@ -34,6 +34,9 @@ jobs:
         # Run npm install until the Better Auth workspace dependency is locked locally.
         run: npm install
 
+      - name: Unit tests
+        run: npm run test:unit
+
       - name: Typecheck web
         run: npm run typecheck:web
 

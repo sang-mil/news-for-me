@@ -24,8 +24,7 @@ export async function handleAuthMigration(
   if (!env.BETTER_AUTH_SECRET?.trim() ||
       !env.BETTER_AUTH_URL?.trim() ||
       !env.GOOGLE_CLIENT_ID?.trim() ||
-      !env.GOOGLE_CLIENT_SECRET?.trim() ||
-      !env.AUTH_ALLOWED_EMAIL?.trim()) {
+      !env.GOOGLE_CLIENT_SECRET?.trim()) {
     return jsonResponse({ error: "Google authentication configuration is incomplete." }, 503, allowedOrigin);
   }
 
