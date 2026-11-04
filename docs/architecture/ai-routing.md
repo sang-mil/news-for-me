@@ -1,19 +1,41 @@
-﻿# AI Routing
+# AI Routing
 
-Default Gemini models:
-- Primary: `gemini-3.8-flash`
-- Fallback: `gemini-3.5-flash-lite`
+## Gemini model discovery and priority
 
-Provider order:
-1. Gemini key 1 / primary model
-2. Gemini key 1 / fallback model
-3. Gemini key 2 / primary and fallback models, if eligible
-4. OpenRouter
+The settings API reads the models available to the current user's Gemini API key
+from `GET /v1beta/models` and keeps models that support `generateContent`.
+Only text-oriented Gemini models are offered for news summaries.
 
-Gemini quotas apply per Google Cloud project, not per API key. Set the same
-`GEMINI_PROJECT_SLOT_1` and `GEMINI_PROJECT_SLOT_2` when both keys belong to
-one project. After a 429 in the same or unknown project, the router will not
-try the second key as a quota workaround.
+The selected model is a priority, not an exclusive model lock:
+1. Try the selected model first.
+2. Try the legacy configured fallback model next, if it is eligible.
+3. Try the remaining eligible models returned by the API catalog.
+
+By default, automatic fallback is limited to models currently identified as
+Free Tier in the official Gemini pricing table. Models with paid or unknown
+pricing can be included only after the user explicitly enables
+`allowPaidGemini`. The Gemini model catalog does not include account-specific
+pricing metadata, so the app deliberately treats unknown models as not free.
+
+The current conservative Free Tier allowlist is maintained in
+`apps/worker/src/services/ai/gemini-models.ts` and must be reviewed whenever
+Google changes model availability or pricing.
+
+## Provider and key order
+
+1. The user's saved Gemini key (or platform Gemini key 1 when no user key is saved):
+   selected model, eligible catalog models, then safe fallback defaults if
+   catalog discovery is temporarily unavailable.
+2. Platform Gemini key 2 when configured and eligible. A 429 response skips
+   a second key in the same or unknown Google Cloud project, but the router
+   continues trying other eligible model IDs with the first key.
+3. OpenRouter using the configured model, defaulting to `openrouter/free`.
+
+Gemini quotas are project-scoped and can also be model-specific. Changing
+models does not merge quotas or bypass project-wide limits; it only lets the
+router use another model's available quota when that model has capacity.
+Set the same `GEMINI_PROJECT_SLOT_1` and `GEMINI_PROJECT_SLOT_2` when both
+platform keys belong to one project.
 
 OpenRouter defaults to `openrouter/free`. Other model IDs are blocked unless
 `OPENROUTER_ALLOW_PAID=true`. Free OpenRouter models are rate limited.
