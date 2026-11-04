@@ -10,6 +10,7 @@ import {
   createTag, deleteTag, updateTag
 } from "./lib/api";
 import { signInWithGoogle, signOutFromNewsForMe } from "./lib/auth-client";
+import Settings from "./features/settings/Settings";
 
 type ApiStatus = "checking" | "online" | "offline";
 type AuthStatus = "checking" | "signed-in" | "signed-out" | "unavailable";
@@ -441,6 +442,7 @@ export default function App() {
         <nav className="top-nav" aria-label="주요 메뉴">
           <a href="#archive">보관함</a>
           <a href="#topics">관심 주제</a>
+          <a href="#settings">연동 설정</a>
           <a className="top-nav-cta" href="#topic-form">주제 추가 <span aria-hidden="true">↗</span></a>
         </nav>
         {authUser && !authUser.isDevelopment && (
@@ -506,6 +508,8 @@ export default function App() {
           <button type="button" className="feedback-close" onClick={() => { setError(""); setNotice(""); }} aria-label="알림 닫기">×</button>
         </div>
       )}
+
+      <Settings />
 
       <section className="scraps-section" id="archive" aria-labelledby="archive-title">
         <div className="section-heading archive-heading">
@@ -722,7 +726,7 @@ export default function App() {
             <p className="field-help">키워드는 각각 최대 20개까지 등록할 수 있어요.</p>
             <button className="submit-button" type="submit" disabled={isSaving || status !== "online"}>{isSaving ? "저장 중…" : editingId ? "변경사항 저장" : "관심 항목 등록"}<span aria-hidden="true">→</span></button>
           </form>
-          <div className="privacy-note"><span>⌑</span> 현재는 로컬 개발용 사용자 데이터로 저장됩니다.</div>
+          <div className="privacy-note"><span>⌑</span> 로그인한 계정별로 설정과 데이터가 분리되어 저장됩니다.</div>
         </aside>
       </section>
       <footer className="footer"><span>News for Me</span><span>YOUR PERSONAL AI NEWS BRIEFING</span></footer>

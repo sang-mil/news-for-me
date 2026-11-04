@@ -11,13 +11,11 @@
 - Queues: RSS 수집 후 비동기 AI 요약
 - Cron: 주간 미스크랩 기사 정리
 
-운영에서는 ALLOW_DEV_AUTH를 절대 설정하지 않습니다. Google에서 이메일 확인이 끝난 AUTH_ALLOWED_EMAIL 계정만 앱 데이터에 접근할 수 있습니다.
+운영에서는 ALLOW_DEV_AUTH를 절대 설정하지 않습니다. 이메일 확인이 완료된 Google 계정은 각각 별도의 앱 사용자로 가입할 수 있습니다. Google OAuth 앱이 Testing 상태라면 Google Auth Platform의 Test users에 허용할 계정을 등록해야 합니다.
 
 ## 중요한 데이터 보존 규칙
 
-첫 Google 로그인에서 LEGACY_USER_ID에 기존 D1 users.id를 지정하면, 해당 행에 Google 인증 ID를 연결합니다. 기존 users.id는 바꾸지 않습니다. 따라서 그 ID를 참조하는 관심 주제·스크랩·메모·태그·발송 로그가 유지됩니다.
-
-첫 로그인 때 users.email은 Google에서 확인된 이메일로 갱신됩니다. 이 이메일이 다른 사용자 행에서 이미 사용 중이면 연결을 중단합니다. 데이터를 삭제하거나 다른 계정으로 합치지 않습니다.
+첫 Google 로그인에서 LEGACY_USER_ID에 기존 D1 users.id를 지정하면, Google에서 검증된 이메일과 기존 users.email이 일치할 때만 해당 행에 Google 인증 ID를 연결합니다. 기존 users.id는 바꾸지 않으므로 관심 주제·스크랩·메모·태그·발송 로그가 유지됩니다. 이메일이 일치하지 않으면 기존 계정은 건드리지 않고 신규 사용자를 생성합니다. 이 레거시 연결은 다른 신규 계정에 기존 데이터를 할당하는 용도로 사용할 수 없습니다.
 
 운영 D1을 만들기 전에 로컬 D1 백업을 보관하세요. 새 운영 DB가 빈 상태라면 로컬 데이터를 내보내서 이전한 후 인증을 연결해야 합니다.
 
@@ -41,7 +39,7 @@ https://news-for-me.pages.dev/api/auth/callback/google
 
 현재 Gmail 발송에 쓰는 Google OAuth Client ID/Secret을 로그인에도 재사용합니다. Better Auth 로그인은 기본 Google 프로필 권한만 사용하고, Gmail Refresh Token은 테스트 메일 발송용으로 별도 유지합니다.
 
-OAuth 동의 화면이 아직 Testing이라면 Google Auth Platform의 Test users에 AUTH_ALLOWED_EMAIL 계정을 추가하세요. 이 상태에서 gmail.send 권한으로 발급한 Gmail Refresh Token은 7일 후 만료될 수 있습니다. 이는 Google 로그인 세션과 별개의 문제이며, 정기 뉴스레터 발송을 운영하려면 브랜딩·게시 및 필요한 Google 검증을 마친 뒤 Gmail Refresh Token을 새로 발급해야 합니다.
+OAuth 동의 화면이 아직 Testing이라면 Google Auth Platform의 Test users에 로그인할 각 테스트 계정을 추가하세요. 이 상태에서 gmail.send 권한으로 발급한 Gmail Refresh Token은 7일 후 만료될 수 있습니다. 이는 Google 로그인 세션과 별개의 문제이며, 정기 뉴스레터 발송을 운영하려면 브랜딩·게시 및 필요한 Google 검증을 마친 뒤 Gmail Refresh Token을 새로 발급해야 합니다.
 
 ## 2. Cloudflare 리소스 생성
 
@@ -119,9 +117,9 @@ Set-Location C:\dev\news-for-me\apps\worker
 
 ~~~powershell
 npx wrangler secret put BETTER_AUTH_SECRET
+npx wrangler secret put INTEGRATION_ENCRYPTION_KEY
 npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
-npx wrangler secret put AUTH_ALLOWED_EMAIL
 npx wrangler secret put LEGACY_USER_ID
 npx wrangler secret put AUTH_MIGRATION_TOKEN
 npx wrangler secret put GEMINI_API_KEY_1
@@ -131,13 +129,26 @@ npx wrangler secret put GOOGLE_REFRESH_TOKEN
 npx wrangler secret put GMAIL_SENDER
 ~~~
 
-BETTER_AUTH_SECRET과 AUTH_MIGRATION_TOKEN은 각각 별도의 강한 랜덤 값이어야 합니다. GOOGLE_CLIENT_ID/SECRET은 위에서 지정한 OAuth Client와 일치해야 합니다.
+BETTER_AUTH_SECRET, AUTH_MIGRATION_TOKEN, INTEGRATION_ENCRYPTION_KEY는 각각 별도의 강한 랜덤 값이어야 합니다. INTEGRATION_ENCRYPTION_KEY는 Base64로 인코딩된 32바이트 값이어야 하며, 키를 분실하거나 임의로 교체하면 기존 사용자 API 키를 복호화할 수 없습니다. GOOGLE_CLIENT_ID/SECRET은 위에서 지정한 OAuth Client와 일치해야 합니다.
 
-AUTH_ALLOWED_EMAIL은 로그인할 Google 계정 이메일입니다. GMAIL_SENDER도 같은 주소여야 테스트 뉴스레터를 보낼 수 있습니다.
+PowerShell에서 암호화 키를 한 번 생성합니다. 출력된 값을 안전한 비밀 저장소에 백업하고, Worker Secret 등록 프롬프트와 로컬 apps/worker/.dev.vars에 동일한 값을 사용하세요.
+
+~~~powershell
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$bytes = New-Object byte[] 32
+$rng.GetBytes($bytes)
+$integrationKey = [Convert]::ToBase64String($bytes)
+$rng.Dispose()
+$integrationKey
+~~~
+
+같은 D1 데이터를 읽는 모든 Worker 환경은 동일한 키를 사용해야 합니다.
+
+GMAIL_SENDER와 GOOGLE_REFRESH_TOKEN은 아직 서버 공용 Gmail 발신 연동입니다. 사용자별 Gmail OAuth 연결은 이번 API 키 설정 범위에 포함되지 않으므로, Gmail 테스트 발송은 GMAIL_SENDER 계정으로 로그인한 사용자만 사용할 수 있습니다.
 
 LEGACY_USER_ID는 데이터를 이전한 경우 기존 운영 D1의 users.id입니다. 값이 틀리면 첫 로그인 데이터 연결이 실패합니다.
 
-OpenRouter를 사용하지 않는다면 OPENROUTER_API_KEY 등록은 생략할 수 있습니다. GMAIL_SENDER는 로그인 허용 주소(AUTH_ALLOWED_EMAIL)와 동일하게 설정합니다.
+Gemini, OpenRouter, YouTube, X, Threads 키는 설정 화면에서 사용자별로 등록할 수 있습니다. 기존 Worker Secret 값은 개인 키를 등록하지 않은 사용자를 위한 서버 기본값으로 남겨둘 수 있습니다. OpenRouter를 서버 기본값으로 제공하지 않는다면 OPENROUTER_API_KEY 등록은 생략할 수 있습니다.
 
 GEMINI_PROJECT_SLOT_1과 GEMINI_PROJECT_SLOT_2는 Secret이 아닌 일반 변수로 등록하세요. 두 Gemini 키가 같은 Google Cloud 프로젝트에서 발급됐다면 같은 슬롯 이름을 쓰고, 서로 다른 프로젝트라면 각 프로젝트를 구분하는 고유한 라벨을 사용합니다. 로컬 .dev.vars.example의 google-project-a/b는 예시 문자열일 뿐 실제 프로젝트 구성을 반영하지 않습니다.
 
@@ -148,9 +159,15 @@ GEMINI_PROJECT_SLOT_1과 GEMINI_PROJECT_SLOT_2는 Secret이 아닌 일반 변수
 
 GMAIL_SENDER는 Worker 대시보드의 Variables 또는 Secret로 등록합니다. 코드상 테스트 발송 수신자는 로그인한 이메일로 고정되어 있으며, 다른 주소를 클라이언트가 지정할 수 없습니다.
 
-## 뉴스 수집 소스 설정
+## 사용자별 API 연동 설정
 
-YouTube와 X는 선택형 소스입니다. Worker Secret에 등록되어야 Queue Consumer 실행 시 사용할 수 있습니다.
+`INTEGRATION_ENCRYPTION_KEY`를 Worker Secret으로 설정한 뒤 마이그레이션을 적용하고 Worker를 배포하세요. 로그인한 사용자는 앱의 `연동 설정`에서 Gemini, OpenRouter, Threads, X, YouTube 키를 개별 등록·교체·삭제하고 연결 테스트를 실행할 수 있습니다. API 키 원문은 다시 조회할 수 없으며, Worker에서 AES-256-GCM으로 암호화한 뒤 D1에 저장합니다. 사용자별 키가 서버 기본 Worker Secret보다 우선하며, 저장된 연동을 비활성화하면 해당 사용자의 서버 기본 키 fallback도 차단됩니다.
+
+X 연결 테스트는 최근 검색 API를 호출할 수 있으므로 X API 사용량 또는 비용이 발생할 수 있습니다. YouTube 연결 테스트도 소량의 quota를 사용합니다.
+
+## 서버 기본 뉴스 수집 소스 (선택)
+
+개별 사용자가 키를 등록하지 않은 경우를 위해 기존 Worker Secret을 공유 기본값으로 남겨둘 수 있습니다. 사용자가 개인 키를 저장한 서비스는 해당 키를 우선 사용합니다.
 
 ~~~powershell
 npx wrangler secret put YOUTUBE_API_KEY
@@ -224,7 +241,7 @@ Invoke-RestMethod `
 - Google OAuth redirect URI가 https://news-for-me.pages.dev/api/auth/callback/google인지 확인합니다.
 - Worker의 BETTER_AUTH_URL과 ALLOWED_ORIGIN이 실제 Pages 도메인과 일치해야 합니다.
 - 운영 Worker에는 ALLOW_DEV_AUTH를 등록하지 않습니다.
-- AUTH_ALLOWED_EMAIL과 Google 로그인 이메일이 일치해야 합니다.
+- 로그인은 이메일 확인이 완료된 Google 계정에서 가능하며, 기존 D1 사용자 데이터는 기존 이메일과 일치할 때만 자동 연결됩니다.
 - 기존 데이터가 있으면 LEGACY_USER_ID가 정확해야 합니다.
 
 로그인 성공 후 GET /api/me에서 authenticated: true를 확인하고, 기존 관심 주제와 스크랩·메모·태그가 나타나는지 확인하세요.
@@ -245,4 +262,4 @@ BETTER_AUTH_URL=http://127.0.0.1:8787
 
 ## 알려진 배포 전제
 
-현재 앱은 단일 소유자 구성으로 제한되어 있습니다. AUTH_ALLOWED_EMAIL은 한 계정만 허용하며, 여러 사람이 사용하는 공개 서비스로 확장할 때는 이 제한과 뉴스레터 수신자/예약 설정을 사용자별 구조로 변경해야 합니다.
+앱 데이터와 Gemini, OpenRouter, Threads, X, YouTube 연동 키는 사용자별로 분리됩니다. 다만 Gmail 발송은 아직 서버 공용 OAuth Refresh Token과 GMAIL_SENDER를 사용하므로, 해당 발신 주소와 로그인 이메일이 일치하는 계정만 테스트 메일을 보낼 수 있습니다. 사용자별 Gmail OAuth 연결은 별도 작업입니다.

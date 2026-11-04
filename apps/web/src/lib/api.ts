@@ -135,3 +135,43 @@ export async function replaceScrapTags(articleId: string, tagIds: string[]): Pro
   });
   return response.data;
 }
+
+export type IntegrationProvider = "gemini" | "openrouter" | "threads" | "x" | "youtube";
+export interface IntegrationConfig {
+  enabled?: boolean;
+  modelPrimary?: string;
+  modelFallback?: string;
+  model?: string;
+  allowPaid?: boolean;
+  projectSlot?: string;
+}
+export interface IntegrationStatus {
+  provider: IntegrationProvider;
+  configured: boolean;
+  enabled: boolean;
+  status: "not_configured" | "saved" | "connected" | "error";
+  config: IntegrationConfig;
+  lastValidatedAt: string | null;
+  platformDefaultAvailable: boolean;
+}
+export async function listIntegrations(): Promise<IntegrationStatus[]> {
+  const response = await request<{ data: IntegrationStatus[] }>("/api/integrations");
+  return response.data;
+}
+export async function saveIntegration(
+  provider: IntegrationProvider,
+  credential: string,
+  config: IntegrationConfig
+): Promise<IntegrationStatus> {
+  const response = await request<{ data: IntegrationStatus }>("/api/integrations/" + provider, {
+    method: "PUT",
+    body: JSON.stringify({ credential, config })
+  });
+  return response.data;
+}
+export async function testIntegration(provider: IntegrationProvider): Promise<void> {
+  await request<{ data: { ok: boolean } }>("/api/integrations/" + provider + "/test", { method: "POST", body: "{}" });
+}
+export async function removeIntegration(provider: IntegrationProvider): Promise<void> {
+  await request<{ ok: boolean }>("/api/integrations/" + provider, { method: "DELETE" });
+}

@@ -7,6 +7,7 @@ import type { GmailEnvironment } from "./services/email/types";
 import { createAuth, isBetterAuthConfigured } from "./services/auth/better-auth";
 import { resolveAppIdentity } from "./lib/authentication";
 import { handleAuthMigration } from "./routes/auth-migration";
+import { handleIntegrationsRequest } from "./routes/integrations";
 import { cleanupUnScrapedNews } from "./services/maintenance/article-cleanup";
 import { jsonResponse } from "./lib/http";
 import { handleNewsCollectionQueue } from "./queues/consumers/news-collection";
@@ -24,9 +25,9 @@ interface Env extends AIEnvironment, GmailEnvironment {
   BETTER_AUTH_URL?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
-  AUTH_ALLOWED_EMAIL?: string;
   LEGACY_USER_ID?: string;
   AUTH_MIGRATION_TOKEN?: string;
+  INTEGRATION_ENCRYPTION_KEY?: string;
   YOUTUBE_API_KEY?: string;
   X_BEARER_TOKEN?: string;
   THREADS_ACCESS_TOKEN?: string;
@@ -125,6 +126,8 @@ export default {
       }
     }
 
+    const isIntegrationsApi = url.pathname === "/api/integrations" || url.pathname.startsWith("/api/integrations/");
+
     const isNewsletterApi =
       url.pathname === "/api/newsletter/preview" ||
       url.pathname === "/api/newsletter/send-test";
@@ -140,7 +143,7 @@ export default {
       url.pathname === "/api/topics" ||
       url.pathname.startsWith("/api/topics/");
 
-    if (isNewsletterApi || isScrapsApi || isTopicsApi) {
+    if (isIntegrationsApi || isNewsletterApi || isScrapsApi || isTopicsApi) {
       let identity;
       try {
         identity = await resolveAppIdentity(request, env);
@@ -155,6 +158,15 @@ export default {
           401,
           allowedOrigin
         );
+      }
+
+      if (isIntegrationsApi) {
+        try {
+          return await handleIntegrationsRequest(request, env, identity.userId, allowedOrigin);
+        } catch (error) {
+          console.error("Integrations API error:", error instanceof Error ? error.message : "Unknown error");
+          return jsonResponse({ error: "연동 설정을 처리하지 못했습니다." }, 500, allowedOrigin);
+        }
       }
 
       if (isNewsletterApi) {

@@ -6,7 +6,6 @@ export interface BetterAuthEnvironment {
   BETTER_AUTH_URL?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
-  AUTH_ALLOWED_EMAIL?: string;
   ALLOWED_ORIGIN?: string;
 }
 
@@ -15,8 +14,7 @@ export function isBetterAuthConfigured(env: BetterAuthEnvironment): boolean {
     env.BETTER_AUTH_SECRET?.trim() &&
     env.BETTER_AUTH_URL?.trim() &&
     env.GOOGLE_CLIENT_ID?.trim() &&
-    env.GOOGLE_CLIENT_SECRET?.trim() &&
-    env.AUTH_ALLOWED_EMAIL?.trim()
+    env.GOOGLE_CLIENT_SECRET?.trim()
   );
 }
 
@@ -28,7 +26,7 @@ export function createAuth(env: BetterAuthEnvironment) {
 
   if (!baseURL || !secret || !clientId || !clientSecret) {
     throw new Error(
-      "Google authentication is not configured. Set BETTER_AUTH_SECRET, BETTER_AUTH_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and AUTH_ALLOWED_EMAIL."
+      "Google authentication is not configured. Set BETTER_AUTH_SECRET, BETTER_AUTH_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET."
     );
   }
 

@@ -13,7 +13,8 @@
 - 관심 주제별 기사 목록
 - 스크랩, 개인 메모, 사용자 태그와 검색/필터
 - 최근 AI 요약 뉴스레터 미리보기와 Gmail 테스트 발송
-- Google OAuth 로그인과 사용자별 D1 데이터 분리
+- Google OAuth 다중 사용자 로그인과 사용자별 D1 데이터 분리
+- Gemini, OpenRouter, Threads, X, YouTube API 키의 사용자별 설정 및 AES-GCM 암호화 저장
 - 매주 미스크랩 뉴스 정리
 
 ## 기술 구성
@@ -32,13 +33,13 @@
 npm install
 ~~~
 
-Copy `apps/worker/.dev.vars.example` to `apps/worker/.dev.vars`, then fill in the local developer ID/email and API credentials. Keep `ALLOW_DEV_AUTH=true` only in the local `.dev.vars` file.
+Copy `apps/worker/.dev.vars.example` to `apps/worker/.dev.vars`, then fill in the local developer ID/email and API credentials. Set a persistent Base64-encoded 32-byte `INTEGRATION_ENCRYPTION_KEY` before saving per-user credentials. Keep `ALLOW_DEV_AUTH=true` only in the local `.dev.vars` file.
 
 YouTube collection is optional. Enable YouTube Data API v3 in a Google Cloud project, create an API key, and add `YOUTUBE_API_KEY` to `apps/worker/.dev.vars`. Restrict the key to the YouTube Data API v3 and keep it out of source control. Without this key, other collection sources continue to work normally.
 
-X post collection is also optional. Add an X API Bearer Token as `X_BEARER_TOKEN` to `apps/worker/.dev.vars` or a Cloudflare Worker secret. X uses pay-per-usage billing and post reads are currently listed at USD 0.005 per returned post; a recent-search call requires at least 10 results, so control usage and set a spending limit in the X Developer Console. Without the token, X is shown as skipped in collection diagnostics.
+X post collection is also optional. Each signed-in user can save an X API Bearer Token in Settings → Service integrations. The Worker `X_BEARER_TOKEN` secret remains available as a shared server default for users who have not saved a personal key. X uses pay-per-usage billing and post reads are currently listed at USD 0.005 per returned post; a recent-search call requires at least 10 results, so control usage and set a spending limit in the X Developer Console. Without the token, X is shown as skipped in collection diagnostics.
 
-Threads collection is optional. Create a Meta app with the Threads use case, obtain a user access token with `threads_basic` and the approved `threads_keyword_search` permission, and configure it as `THREADS_ACCESS_TOKEN` in `apps/worker/.dev.vars` or a Cloudflare Worker secret. Public keyword search is subject to Meta App Review; without approval, public search may be restricted to the authorized account's own content. Keep the token server-side and refresh/replace it before it expires.
+Threads collection is optional. Each signed-in user can save a Threads user access token in Settings → Service integrations. Create a Meta app with the Threads use case and obtain a user token with `threads_basic` and the approved `threads_keyword_search` permission. The Worker `THREADS_ACCESS_TOKEN` secret remains available as a shared server default. Public keyword search is subject to Meta App Review; without approval, public search may be restricted to the authorized account's own content. Keep the token server-side and refresh/replace it before it expires.
 
 GitHub and V2EX are only queried for software/developer/technology topics to avoid filling unrelated topics (for example, sports) with repository links. All active sources also pass a topic/include-keyword relevance check before their results are stored.
 
@@ -62,7 +63,9 @@ npx wrangler secret put X_BEARER_TOKEN --config .\apps\worker\wrangler.jsonc
 
 ## Security notes
 
-- Never commit `.dev.vars`, OAuth secrets, API keys, refresh tokens, or migration tokens.
+- Never commit `.dev.vars`, OAuth secrets, API keys, refresh tokens, encryption keys, or migration tokens.
+- User API credentials are encrypted with AES-256-GCM before being stored in D1. Back up `INTEGRATION_ENCRYPTION_KEY` securely; losing it makes saved user credentials permanently unreadable.
+- Gemini, OpenRouter, Threads, X, and YouTube user credentials are isolated by application user ID. User-saved credentials override server defaults; disabling a saved integration disables that provider for that user.
 - Production app APIs require a verified Google identity.
-- The first Google sign-in can link the configured legacy application user to preserve existing D1 data.
+- The first Google sign-in links the configured legacy D1 user only when the verified Google email matches that existing user's email; otherwise a new app user is created.
 - Public deployment requires production D1/Queue resources and Google OAuth callback configuration.

@@ -1,4 +1,7 @@
 ﻿# Add the real values to apps/worker/.dev.vars, not to this example file.
+# Generate a persistent 32-byte key, Base64-encode it, and keep it private.
+# The same key is required to decrypt previously saved per-user API credentials.
+INTEGRATION_ENCRYPTION_KEY=replace-with-base64-encoded-32-byte-key
 # Local-only identity (keep your current user ID to preserve local data).
 DEV_USER_ID=your-existing-local-user-id
 DEV_USER_EMAIL=your-local-email
@@ -34,14 +37,13 @@ OPENROUTER_APP_TITLE=News for Me
 GOOGLE_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
 
-# Better Auth session and single-owner account restriction.
+# Better Auth session. Verified Google accounts can create separate app users.
 BETTER_AUTH_SECRET=replace-with-a-long-random-secret
 BETTER_AUTH_URL=http://127.0.0.1:8787
-AUTH_ALLOWED_EMAIL=your-google-login-email
 # Preserve the current News for Me data owner on first Google login.
 LEGACY_USER_ID=your-existing-DEV_USER_ID
 
-# Gmail API sending (keep the sender equal to AUTH_ALLOWED_EMAIL).
+# Gmail API sending remains a server-level sender integration for now.
 GOOGLE_REFRESH_TOKEN=your-gmail-refresh-token
 GMAIL_SENDER=your-google-login-email
 
