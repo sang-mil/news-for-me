@@ -186,6 +186,34 @@ export async function saveIntegration(
 export async function testIntegration(provider: IntegrationProvider): Promise<void> {
   await request<{ data: { ok: boolean } }>("/api/integrations/" + provider + "/test", { method: "POST", body: "{}" });
 }
+
+export interface NewsletterPreview {
+  subject: string;
+  html: string;
+  text: string;
+  articleCount: number;
+  periodDays: number;
+  generatedAt: string;
+}
+export interface NewsletterSendResult {
+  ok: boolean;
+  deliveryId: string;
+  recipient: string;
+  messageId: string | null;
+  articleCount: number;
+}
+export async function getNewsletterPreview(): Promise<NewsletterPreview> {
+  const response = await request<{ data: NewsletterPreview }>("/api/newsletter/preview");
+  return response.data;
+}
+export async function sendNewsletterNow(): Promise<NewsletterSendResult> {
+  const response = await request<{ data: NewsletterSendResult }>("/api/newsletter/send-test", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true })
+  });
+  return response.data;
+}
+
 export async function removeIntegration(provider: IntegrationProvider): Promise<void> {
   await request<{ ok: boolean }>("/api/integrations/" + provider, { method: "DELETE" });
 }
