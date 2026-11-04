@@ -292,4 +292,4 @@ BETTER_AUTH_URL=http://127.0.0.1:8787
 
 ## 알려진 배포 전제
 
-앱 데이터와 Gemini, OpenRouter, Threads, X, YouTube 연동 키는 사용자별로 분리됩니다. 다만 Gmail 발송은 아직 서버 공용 OAuth Refresh Token과 GMAIL_SENDER를 사용하므로, 해당 발신 주소와 로그인 이메일이 일치하는 계정만 테스트 메일을 보낼 수 있습니다. 사용자별 Gmail OAuth 연결은 별도 작업입니다.
+앱 데이터와 Gemini, OpenRouter, Threads, X, YouTube 연동 키는 사용자별로 분리됩니다. Gmail 발송은 서버 공용 OAuth Refresh Token과 GMAIL_SENDER를 사용하며, 로그인한 사용자는 자신의 뉴스 브리핑을 원하는 단일 수신 주소로 발송할 수 있습니다. 발신 주소와 로그인 이메일이 같을 필요는 없습니다. 사용자별 Gmail OAuth 연결은 별도 작업입니다.
