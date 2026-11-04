@@ -35,9 +35,11 @@ export class GeminiModelCatalogError extends Error {
 // conservative allowlist in sync with the official Gemini API pricing page.
 export const FREE_TIER_GEMINI_MODEL_IDS = [
   "gemini-3.8-flash",
+  "gemini-3.6-flash",
   "gemini-3.5-flash",
   "gemini-3.5-flash-lite",
   "gemini-3.1-flash-lite",
+  "gemini-2.5-pro",
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite"
 ] as const;
@@ -63,7 +65,7 @@ export function parseGeminiModelCatalog(value: unknown): GeminiModelOption[] {
     if (typeof item.name !== "string") continue;
 
     const id = item.name.replace(/^models\//, "").trim();
-    if (!/^(gemini|gemma)-[a-z0-9][a-z0-9._-]*$/i.test(id)) continue;
+    if (!/^gemini-[a-z0-9][a-z0-9._-]*$/i.test(id)) continue;
     if (EXCLUDED_MODEL_PATTERN.test(id)) continue;
     if (!Array.isArray(item.supportedGenerationMethods) ||
         !item.supportedGenerationMethods.includes("generateContent")) continue;
@@ -88,7 +90,7 @@ export async function listGeminiModels(apiKey: string): Promise<GeminiModelOptio
 
   for (let page = 0; page < 5; page += 1) {
     const url = new URL("https://generativelanguage.googleapis.com/v1beta/models");
-    url.searchParams.set("pageSize", "1000");
+    url.searchParams.set("pageSize", "100");
     if (pageToken) url.searchParams.set("pageToken", pageToken);
 
     let response: Response;
@@ -144,7 +146,7 @@ export function resolveGeminiModelOrder(
 
   // If discovery is unavailable or the API returns an empty catalog, keep a
   // small, known-free fallback set so a transient catalog issue does not stop summaries.
-  if (ordered.length === 0 && !allowPaidModels) {
+  if (ordered.length === 0) {
     return [...FREE_TIER_GEMINI_MODEL_IDS];
   }
   return [...new Set(ordered)];
