@@ -1,4 +1,5 @@
 ﻿import type { GmailEnvironment, GmailSendResult } from "./types";
+import { describeGoogleOAuthRefreshFailure } from "./oauth-errors";
 
 function utf8Base64(value: string): string {
   const bytes = new TextEncoder().encode(value);
@@ -58,8 +59,11 @@ export async function sendGmailMessage(
     error_description?: string;
   };
   if (!tokenResponse.ok || !tokenBody.access_token) {
-    const reason = tokenBody.error_description ?? tokenBody.error ?? `HTTP ${tokenResponse.status}`;
-    throw new Error(`Google OAuth 토큰 갱신 실패: ${reason}`);
+    throw new Error(describeGoogleOAuthRefreshFailure(
+      tokenResponse.status,
+      tokenBody.error,
+      tokenBody.error_description
+    ));
   }
 
   const safeSubject = safeHeader(subject, 150);

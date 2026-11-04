@@ -211,6 +211,25 @@ GitHub 저장소와 V2EX는 개발/기술 관련 주제에서만 검색합니다
 
 Threads는 Meta Threads API `keyword_search`를 사용합니다. Meta 앱에서 Threads API 사용 사례를 설정하고 OAuth 사용자 토큰에 `threads_basic` 및 승인된 `threads_keyword_search` 권한을 요청하세요. 공개 게시물 키워드 검색은 Meta 앱 검토 승인이 필요할 수 있으며, 승인 전에는 공개 검색 결과가 제한될 수 있습니다. 토큰은 프론트엔드에 전달하지 말고 Worker Secret `THREADS_ACCESS_TOKEN`으로만 저장하세요. 사용자 액세스 토큰의 만료 시점을 관리하고 만료 전에 갱신해야 합니다.
 
+## Gmail OAuth 갱신 오류 진단
+
+뉴스레터 발송에서 Google OAuth 토큰 갱신이 거부되면 오류에 표시된 Google 오류 코드를 먼저 확인합니다.
+
+- `invalid_client` / HTTP 401: Worker의 `GOOGLE_CLIENT_ID`와 `GOOGLE_CLIENT_SECRET`이 같은 OAuth 클라이언트의 조합인지 확인합니다. Client Secret을 재생성했다면 Cloudflare Worker Secret도 새 값으로 갱신해야 합니다.
+- `invalid_grant` / HTTP 400: `GOOGLE_REFRESH_TOKEN`이 현재 Worker의 `GOOGLE_CLIENT_ID`로 발급됐는지 확인합니다. 다른 OAuth 클라이언트로 발급했거나 폐기·만료된 경우에만 동일한 Client ID/Secret으로 새 토큰을 발급합니다.
+- `unauthorized_client`: 해당 OAuth 클라이언트가 refresh token grant와 Gmail 권한을 사용할 수 있는지 확인합니다.
+
+운영 Worker의 Secret 이름과 설정 대상은 PowerShell에서 확인할 수 있습니다.
+
+~~~powershell
+Set-Location C:\\dev\\news-for-me\\apps\\worker
+npx wrangler secret list --config .\\wrangler.jsonc
+~~~
+
+이 명령은 Secret 값이 아니라 등록된 이름만 출력합니다. 실제 값은 Cloudflare Dashboard의 Workers & Pages > news-for-me-api > Settings > Variables and Secrets에서 Google Cloud Console의 동일 OAuth 클라이언트 정보와 대조하세요. `GOOGLE_REFRESH_TOKEN`은 그 클라이언트에서 발급된 값이어야 합니다. OAuth 토큰이나 Client Secret을 채팅, GitHub, 로그에 붙여넣지 마세요.
+
+Google OAuth 동의 화면이 External + Testing 상태이고 Gmail API처럼 프로필 외 범위를 요청했다면 Refresh Token이 7일 후 만료될 수 있습니다. 발급 다음 날 바로 실패한다면 7일 만료보다는 Client ID/Secret 불일치 또는 다른 Client에서 발급된 Refresh Token 가능성을 먼저 확인합니다.
+
 ## 5. Worker 배포
 
 ~~~powershell
