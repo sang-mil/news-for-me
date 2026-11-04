@@ -17,9 +17,10 @@ jobs:
   monitor:
     name: Check Pages, API and D1
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Check production and manage incident
+        id: monitor
         uses: actions/github-script@v7
         env:
           HEALTH_BASE_URL: https://news-for-me.pages.dev
@@ -43,9 +44,9 @@ jobs:
                   try { body = JSON.parse(text); } catch {}
 
                   if (validate(response, body)) {
-                    return { name, url, ok: true, detail: `HTTP ${response.status}` };
+                    return { name, url, ok: true, detail: "HTTP " + response.status };
                   }
-                  lastDetail = `HTTP ${response.status}; response: ${text.slice(0, 300) || "(empty)"}`;
+                  lastDetail = "HTTP " + response.status + "; response: " + (text.slice(0, 300) || "(empty)");
                 } catch (error) {
                   lastDetail = error instanceof Error ? error.message : String(error);
                 }
@@ -55,14 +56,14 @@ jobs:
                 }
               }
 
-              return { name, url, ok: false, detail: `3 attempts failed; ${lastDetail}` };
+              return { name, url, ok: false, detail: "3 attempts failed; " + lastDetail };
             }
 
             const results = await Promise.all([
-              checkEndpoint("Pages", `${baseUrl}/`, (response) => response.ok),
+              checkEndpoint("Pages", baseUrl + "/", (response) => response.ok),
               checkEndpoint(
                 "API + D1",
-                `${baseUrl}/api/health`,
+                baseUrl + "/api/health",
                 (response, body) =>
                   response.ok &&
                   body?.ok === true &&
@@ -72,7 +73,7 @@ jobs:
             ]);
 
             const failures = results.filter((result) => !result.ok);
-            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const runUrl = context.serverUrl + "/" + owner + "/" + repo + "/actions/runs/" + context.runId;
             const openIssues = await github.paginate(github.rest.issues.listForRepo, {
               owner,
               repo,
@@ -96,16 +97,17 @@ jobs:
                   body: JSON.stringify({ content: message })
                 });
                 if (!response.ok) {
-                  core.warning(`Discord webhook returned HTTP ${response.status}.`);
+                  core.warning("Discord webhook returned HTTP " + response.status + ".");
                 }
               } catch (error) {
-                core.warning(`Discord notification failed: ${error instanceof Error ? error.message : String(error)}`);
+                core.warning("Discord notification failed: " + (error instanceof Error ? error.message : String(error)));
               }
             }
 
             if (failures.length > 0) {
-              const report = failures.map((item) => `- ${item.name}: ${item.url}\n  ${item.detail}`).join("\n");
+              const report = failures.map((item) => "- " + item.name + ": " + item.url + "\n  " + item.detail).join("\n");
               if (!incident) {
+                const detectedAt = new Date().toISOString();
                 const created = await github.rest.issues.create({
                   owner,
                   repo,
@@ -114,27 +116,44 @@ jobs:
                   body: [
                     "## Production health check detected an outage",
                     "",
-                    `Detected at: ${new Date().toISOString()}`,
+                    "Detected at: " + detectedAt,
                     "",
                     report,
                     "",
-                    `Monitor run: ${runUrl}`,
+                    "Monitor run: " + runUrl,
                     "",
-                    "이 이슈는 장애가 처음 감지되었을 때 한 번 생성됩니다. 정상 상태가 확인되면 모니터가 복구 내용을 댓글로 남기고 자동으로 닫습니다."
+                    "이 이슈는 장애가 처음 감지되었을 때 생성됩니다. 정상 상태가 확인되면 모니터가 복구 내용을 댓글로 남기고 자동으로 닫습니다."
                   ].join("\n")
                 });
-                core.error(`Production outage detected. Incident issue #${created.data.number} created.`);
+                const emailBody = [
+                  "News for Me 서비스 장애가 감지되었습니다.",
+                  "",
+                  "감지 시각: " + detectedAt,
+                  "",
+                  report,
+                  "",
+                  "GitHub 장애 이슈: " + created.data.html_url,
+                  "Actions 실행: " + runUrl
+                ].join("\n");
+
+                core.setOutput("email_subject", "[News for Me] 서비스 장애 감지");
+                core.setOutput("email_body", emailBody);
+                core.setOutput("health_failed", "true");
+                core.error("Production outage detected. Incident issue #" + created.data.number + " created.");
+
                 await sendDiscord(
-                  `🚨 **News for Me 장애 감지**\n${report}\n이슈: ${created.data.html_url}\n모니터: ${runUrl}`
+                  "🚨 **News for Me 장애 감지**\n" + report +
+                  "\n이슈: " + created.data.html_url + "\n모니터: " + runUrl
                 );
               } else {
-                core.error(`Production remains unhealthy. Tracking in issue #${incident.number}.`);
+                core.setOutput("health_failed", "true");
+                core.error("Production remains unhealthy. Tracking in issue #" + incident.number + ".");
               }
-              core.setFailed("Production health check failed.");
               return;
             }
 
             if (incident) {
+              const recoveredAt = new Date().toISOString();
               await github.rest.issues.createComment({
                 owner,
                 repo,
@@ -142,11 +161,11 @@ jobs:
                 body: [
                   "## 복구 확인",
                   "",
-                  `Recovered at: ${new Date().toISOString()}`,
+                  "Recovered at: " + recoveredAt,
                   "",
-                  ...results.map((item) => `- ${item.name}: healthy (${item.detail})`),
+                  ...results.map((item) => "- " + item.name + ": healthy (" + item.detail + ")"),
                   "",
-                  `Monitor run: ${runUrl}`
+                  "Monitor run: " + runUrl
                 ].join("\n")
               });
               await github.rest.issues.update({
@@ -156,14 +175,98 @@ jobs:
                 state: "closed",
                 state_reason: "completed"
               });
+
+              const emailBody = [
+                "News for Me 서비스가 정상 상태로 복구되었습니다.",
+                "",
+                "복구 확인 시각: " + recoveredAt,
+                "",
+                ...results.map((item) => "- " + item.name + ": 정상 (" + item.detail + ")"),
+                "",
+                "닫힌 장애 이슈: " + context.serverUrl + "/" + owner + "/" + repo + "/issues/" + incident.number,
+                "Actions 실행: " + runUrl
+              ].join("\n");
+
+              core.setOutput("email_subject", "[News for Me] 서비스 복구");
+              core.setOutput("email_body", emailBody);
+
               await sendDiscord(
-                `✅ **News for Me 서비스 복구**\nPages 및 API/D1 헬스체크가 정상으로 돌아왔습니다.\n닫힌 장애 이슈: #${incident.number}\n모니터: ${runUrl}`
+                "✅ **News for Me 서비스 복구**\nPages 및 API/D1 헬스체크가 정상으로 돌아왔습니다." +
+                "\n닫힌 장애 이슈: #" + incident.number + "\n모니터: " + runUrl
               );
-              core.notice(`Production recovered. Incident issue #${incident.number} closed.`);
+              core.notice("Production recovered. Incident issue #" + incident.number + " closed.");
               return;
             }
 
             for (const item of results) {
-              core.info(`Healthy: ${item.name} (${item.detail})`);
+              core.info("Healthy: " + item.name + " (" + item.detail + ")");
             }
             core.notice("Production Pages, API and D1 are healthy.");
+
+      - name: Send email notification
+        if: steps.monitor.outputs.email_subject != ''
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST || 'smtp.gmail.com' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '465' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+          EMAIL_SUBJECT: ${{ steps.monitor.outputs.email_subject }}
+          EMAIL_BODY: ${{ steps.monitor.outputs.email_body }}
+        run: |
+          python - <<'PY'
+          import os
+          import smtplib
+          import ssl
+          import sys
+          import time
+          from email.message import EmailMessage
+
+          required = ["SMTP_USERNAME", "SMTP_PASSWORD", "ALERT_EMAIL_TO"]
+          missing = [name for name in required if not os.environ.get(name)]
+          if missing:
+              print("Email notification skipped; configure these GitHub Actions secrets: " + ", ".join(missing))
+              sys.exit(0)
+
+          host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+          port = int(os.environ.get("SMTP_PORT", "465"))
+          username = os.environ["SMTP_USERNAME"]
+          password = os.environ["SMTP_PASSWORD"]
+
+          message = EmailMessage()
+          message["From"] = os.environ.get("ALERT_EMAIL_FROM") or username
+          message["To"] = os.environ["ALERT_EMAIL_TO"]
+          message["Subject"] = os.environ["EMAIL_SUBJECT"]
+          message.set_content(os.environ["EMAIL_BODY"])
+
+          last_error = None
+          for attempt in range(1, 4):
+              try:
+                  if port == 465:
+                      with smtplib.SMTP_SSL(host, port, timeout=20, context=ssl.create_default_context()) as server:
+                          server.login(username, password)
+                          server.send_message(message)
+                  else:
+                      with smtplib.SMTP(host, port, timeout=20) as server:
+                          server.ehlo()
+                          server.starttls(context=ssl.create_default_context())
+                          server.ehlo()
+                          server.login(username, password)
+                          server.send_message(message)
+                  print("Email notification sent successfully.")
+                  sys.exit(0)
+              except Exception as error:
+                  last_error = error
+                  print(f"Email send attempt {attempt}/3 failed: {error}")
+                  if attempt < 3:
+                      time.sleep(5)
+
+          raise SystemExit(f"Email notification failed after 3 attempts: {last_error}")
+          PY
+
+      - name: Mark monitor run as failed when the service is unhealthy
+        if: steps.monitor.outputs.health_failed == 'true'
+        run: |
+          echo "Production health check failed. See the incident issue and notification logs."
+          exit 1
