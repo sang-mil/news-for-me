@@ -98,4 +98,5 @@ jobs:
 
       - name: Deploy Pages
         working-directory: apps/web
-        run: npx wrangler pages deploy dist --project-name news-for-me --branch main --commit-hash "$GITHUB_SHA" --config wrangler.jsonc
+        # Wrangler automatically loads ./wrangler.jsonc from the working directory.
+        run: npx wrangler pages deploy dist --project-name news-for-me --branch main --commit-hash "$GITHUB_SHA"
