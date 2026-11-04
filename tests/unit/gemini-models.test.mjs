@@ -20,9 +20,10 @@ test("Gemini catalog keeps only text-generation language models", () => {
     ]
   });
 
-  assert.deepEqual(models.map((model) => model.id), ["gemini-3.8-flash"]);
+  assert.deepEqual(models.map((model) => model.id), ["gemini-3.8-flash", "gemma-4-26b-a4b-it"]);
   assert.equal(models[0].isFreeTier, true);
   assert.equal(models[0].inputTokenLimit, 1000);
+  assert.equal(models[1].isFreeTier, true);
 });
 
 test("preferred model only changes order; remaining free models remain fallbacks", () => {
