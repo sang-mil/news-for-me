@@ -297,11 +297,12 @@ export default function Settings() {
                                 value={model.id}
                                 disabled={!model.isFreeTier && config.allowPaidGemini !== true}
                               >
-                                {model.displayName} ({model.id}) · {model.isFreeTier ? "무료 등급 확인" : "유료/요금제 확인 필요"}
+                                {model.displayName} ({model.id}) · {model.isFreeTier ? "무료 등급 지원" : "유료/요금제 확인 필요"}
                               </option>
                             ))}
                           </select>
-                          <small>선택한 모델을 먼저 사용합니다. 실패하면 이 API 키에서 사용할 수 있는 다른 무료 등급 확인 모델을 자동으로 시도합니다.</small>
+                          <small>선택한 모델을 먼저 사용합니다. 실패하면 이 API 키에서 사용할 수 있는 다른 무료 등급 지원 모델을 자동으로 시도합니다.</small>
+                          <small>무료 등급 지원도 계정의 무료 사용량을 초과하거나 유료 용량으로 전환하면 요금이 발생할 수 있습니다. Google AI Studio에서 사용량과 결제 상태를 확인하세요.</small>
                           {geminiModelsError && <small>{geminiModelsError}</small>}
                         </label>
                         <label className="integration-checkbox">
