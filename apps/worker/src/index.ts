@@ -3,6 +3,7 @@ import { handleTopicsRequest } from "./routes/topics";
 import { handleCollectionRequest } from "./routes/collection";
 import { handleScrapsRequest } from "./routes/scraps";
 import { handleNewsletterRequest } from "./routes/newsletter";
+import { processDueNewsletterSchedules } from "./services/email/newsletter-scheduler";
 import type { GmailEnvironment } from "./services/email/types";
 import { createAuth, isBetterAuthConfigured } from "./services/auth/better-auth";
 import { resolveAppIdentity } from "./lib/authentication";
@@ -130,7 +131,9 @@ export default {
 
     const isNewsletterApi =
       url.pathname === "/api/newsletter/preview" ||
-      url.pathname === "/api/newsletter/send-test";
+      url.pathname === "/api/newsletter/send-test" ||
+      url.pathname === "/api/newsletter/schedules" ||
+      url.pathname.startsWith("/api/newsletter/schedules/");
 
     const isScrapsApi =
       url.pathname === "/api/scraps" ||
@@ -219,14 +222,22 @@ export default {
   },
 
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
-    if (controller.cron !== "0 15 * * SUN") {
-      console.log("Ignoring unrecognized scheduled event", controller.cron);
+    if (controller.cron === "* * * * *") {
+      const result = await processDueNewsletterSchedules(env.DB, env, controller.scheduledTime);
+      if (result.examined || result.staleFailed) {
+        console.log("Newsletter schedule check completed", result);
+      }
       return;
     }
 
-    console.log("Starting weekly unsaved-news cleanup", new Date(controller.scheduledTime).toISOString());
-    const result = await cleanupUnScrapedNews(env.DB);
-    console.log("Weekly unsaved-news cleanup completed", result);
+    if (controller.cron === "0 15 * * SUN") {
+      console.log("Starting weekly unsaved-news cleanup", new Date(controller.scheduledTime).toISOString());
+      const result = await cleanupUnScrapedNews(env.DB);
+      console.log("Weekly unsaved-news cleanup completed", result);
+      return;
+    }
+
+    console.log("Ignoring unrecognized scheduled event", controller.cron);
   }
 };
 

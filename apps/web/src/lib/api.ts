@@ -217,3 +217,41 @@ export async function sendNewsletterNow(recipient: string): Promise<NewsletterSe
 export async function removeIntegration(provider: IntegrationProvider): Promise<void> {
   await request<{ ok: boolean }>("/api/integrations/" + provider, { method: "DELETE" });
 }
+
+
+export type NewsletterScheduleStatus = "scheduled" | "sending" | "sent" | "failed" | "cancelled";
+export interface NewsletterSchedule {
+  id: string;
+  recipientEmail: string;
+  scheduledAt: string;
+  status: NewsletterScheduleStatus;
+  createdAt: string;
+  sentAt: string | null;
+  errorMessage: string | null;
+}
+export interface NewsletterScheduleCreateResult {
+  id: string;
+  recipientEmail: string;
+  scheduledAt: string;
+  status: "scheduled";
+}
+export async function listNewsletterSchedules(): Promise<NewsletterSchedule[]> {
+  const response = await request<{ data: NewsletterSchedule[] }>("/api/newsletter/schedules");
+  return response.data;
+}
+export async function scheduleNewsletter(
+  recipient: string,
+  scheduledAt: string
+): Promise<NewsletterScheduleCreateResult> {
+  const response = await request<{ data: NewsletterScheduleCreateResult }>("/api/newsletter/schedules", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true, recipient, scheduledAt })
+  });
+  return response.data;
+}
+export async function cancelNewsletterSchedule(id: string): Promise<void> {
+  await request<{ data: { ok: boolean; id: string } }>(
+    `/api/newsletter/schedules/${encodeURIComponent(id)}`,
+    { method: "DELETE" }
+  );
+}

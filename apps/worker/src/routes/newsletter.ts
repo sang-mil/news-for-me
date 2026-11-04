@@ -1,14 +1,14 @@
-﻿import { listRecentNewsletterArticles } from "../db/repositories/newsletter";
 import {
-  createDeliveryLog,
-  markDeliveryFailed,
-  markDeliverySending,
-  markDeliverySent
-} from "../db/repositories/delivery";
+  cancelNewsletterSchedule,
+  createNewsletterSchedule,
+  listNewsletterSchedules
+} from "../db/repositories/newsletter-schedules";
+import { listRecentNewsletterArticles } from "../db/repositories/newsletter";
 import { jsonResponse } from "../lib/http";
-import { sendGmailMessage } from "../services/email/gmail";
-import { renderNewsletter } from "../services/email/renderer";
+import { hasNewsletterMailConfiguration, sendNewsletterForUser } from "../services/email/send-newsletter";
 import { normalizeNewsletterRecipient } from "../services/email/recipient";
+import { validateNewsletterScheduledAt } from "../services/email/newsletter-schedule";
+import { renderNewsletter } from "../services/email/renderer";
 import type { GmailEnvironment } from "../services/email/types";
 
 interface NewsletterEnv extends GmailEnvironment {
@@ -41,60 +41,84 @@ export async function handleNewsletterRequest(
     if (body?.confirm !== true) {
       return jsonResponse({ error: "메일 발송 확인값이 필요합니다." }, 400, allowedOrigin);
     }
-
     const recipient = normalizeNewsletterRecipient(body.recipient);
-    const sender = normalizeNewsletterRecipient(env.GMAIL_SENDER);
     if (!recipient) {
       return jsonResponse({ error: "받는 사람 이메일 주소를 올바르게 입력하세요." }, 400, allowedOrigin);
     }
-    if (!sender) {
-      return jsonResponse({ error: "GMAIL_SENDER에 올바른 Gmail 발신 주소를 설정하세요." }, 503, allowedOrigin);
+    if (!hasNewsletterMailConfiguration(env)) {
+      return jsonResponse({ error: "Gmail 설정이 부족합니다. GMAIL_SENDER와 Google OAuth Secret을 확인하세요." }, 503, allowedOrigin);
     }
-    if (!env.GOOGLE_CLIENT_ID?.trim() || !env.GOOGLE_CLIENT_SECRET?.trim() || !env.GOOGLE_REFRESH_TOKEN?.trim()) {
-      return jsonResponse({ error: "Google OAuth 설정이 부족합니다. GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN을 확인하세요." }, 503, allowedOrigin);
+
+    try {
+      const result = await sendNewsletterForUser(env.DB, env, userId, recipient);
+      return jsonResponse({ data: result }, 200, allowedOrigin);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Unknown Gmail error";
+      console.error("Newsletter email failed", detail);
+      return jsonResponse({ error: "뉴스레터 메일 발송에 실패했습니다.", details: [detail.slice(0, 300)] }, 502, allowedOrigin);
+    }
+  }
+
+  if (url.pathname === "/api/newsletter/schedules" && request.method === "GET") {
+    const schedules = await listNewsletterSchedules(env.DB, userId);
+    return jsonResponse({ data: schedules }, 200, allowedOrigin);
+  }
+
+  if (url.pathname === "/api/newsletter/schedules" && request.method === "POST") {
+    const body = await request.json().catch(() => null) as {
+      confirm?: unknown;
+      recipient?: unknown;
+      scheduledAt?: unknown;
+    } | null;
+    if (body?.confirm !== true) {
+      return jsonResponse({ error: "예약 발송 확인값이 필요합니다." }, 400, allowedOrigin);
+    }
+
+    const recipient = normalizeNewsletterRecipient(body.recipient);
+    if (!recipient) {
+      return jsonResponse({ error: "받는 사람 이메일 주소를 올바르게 입력하세요." }, 400, allowedOrigin);
+    }
+    const validation = validateNewsletterScheduledAt(body.scheduledAt);
+    if (!validation.ok) {
+      return jsonResponse({ error: validation.error }, 400, allowedOrigin);
+    }
+    if (!hasNewsletterMailConfiguration(env)) {
+      return jsonResponse({ error: "Gmail 설정이 부족합니다. GMAIL_SENDER와 Google OAuth Secret을 확인하세요." }, 503, allowedOrigin);
     }
 
     const preview = await buildPreview(env.DB, userId);
     if (preview.articleCount === 0) {
-      return jsonResponse({ error: "발송할 AI 요약 뉴스가 없습니다." }, 404, allowedOrigin);
+      return jsonResponse({ error: "예약할 뉴스레터가 없습니다. 먼저 뉴스 수집을 실행하세요." }, 404, allowedOrigin);
     }
 
-    const deliveryId = crypto.randomUUID();
-    const idempotencyKey = `newsletter:${userId}:${deliveryId}`;
-    await createDeliveryLog(env.DB, {
-      id: deliveryId,
+    const id = crypto.randomUUID();
+    await createNewsletterSchedule(env.DB, {
+      id,
       userId,
       recipientEmail: recipient,
-      subject: preview.subject,
-      idempotencyKey
+      scheduledAt: validation.scheduledAt
     });
-    await markDeliverySending(env.DB, deliveryId);
+    return jsonResponse({
+      data: {
+        id,
+        recipientEmail: recipient,
+        scheduledAt: validation.scheduledAt,
+        status: "scheduled"
+      }
+    }, 201, allowedOrigin);
+  }
 
-    try {
-      const result = await sendGmailMessage(
-        env,
-        recipient,
-        preview.subject,
-        preview.html,
-        preview.text,
-        "News for Me"
-      );
-      await markDeliverySent(env.DB, deliveryId, result.messageId);
-      return jsonResponse({
-        data: {
-          ok: true,
-          deliveryId,
-          recipient,
-          messageId: result.messageId,
-          articleCount: preview.articleCount
-        }
-      }, 200, allowedOrigin);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : "Unknown Gmail error";
-      await markDeliveryFailed(env.DB, deliveryId, detail);
-      console.error("Newsletter email failed", deliveryId, detail);
-      return jsonResponse({ error: "뉴스레터 메일 발송에 실패했습니다.", details: [detail.slice(0, 300)], deliveryId }, 502, allowedOrigin);
+  const schedulePrefix = "/api/newsletter/schedules/";
+  if (url.pathname.startsWith(schedulePrefix) && request.method === "DELETE") {
+    const scheduleId = decodeURIComponent(url.pathname.slice(schedulePrefix.length));
+    if (!scheduleId || scheduleId.includes("/")) {
+      return jsonResponse({ error: "예약 ID가 올바르지 않습니다." }, 400, allowedOrigin);
     }
+    const cancelled = await cancelNewsletterSchedule(env.DB, userId, scheduleId);
+    if (!cancelled) {
+      return jsonResponse({ error: "취소할 수 없는 예약입니다. 이미 발송되었거나 처리 중일 수 있습니다." }, 409, allowedOrigin);
+    }
+    return jsonResponse({ data: { ok: true, id: scheduleId } }, 200, allowedOrigin);
   }
 
   return jsonResponse({ error: "Not Found" }, 404, allowedOrigin);
