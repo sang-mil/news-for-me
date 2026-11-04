@@ -21,13 +21,14 @@ interface GeminiModelListResponse {
 }
 
 export class GeminiModelCatalogError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly code: string
-  ) {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(message: string, status: number, code: string) {
     super(message);
     this.name = "GeminiModelCatalogError";
+    this.status = status;
+    this.code = code;
   }
 }
 
