@@ -10,7 +10,7 @@ interface NewsletterProps {
   userEmail: string;
 }
 
-const EMAIL_RE = /^[^\\s@,;]+@[^\\s@,;]+\\.[^\\s@,;]+$/;
+const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -79,7 +79,7 @@ export default function Newsletter({ userEmail }: NewsletterProps) {
         <div>
           <div className="section-kicker">PERSONAL EMAIL BRIEFING</div>
           <h2 id="newsletter-title">메일 브리핑</h2>
-          <p>최근 7일간 수집된 AI 요약 뉴스를 내 이메일로 받아보세요.</p>
+          <p>최근 7일간 수집된 AI 요약 뉴스를 지정한 이메일 주소로 받아보세요.</p>
         </div>
         <label className="newsletter-recipient" htmlFor="newsletter-recipient-email">
           <span>받는 사람 이메일</span>
