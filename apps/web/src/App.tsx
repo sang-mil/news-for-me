@@ -11,6 +11,7 @@ import {
 } from "./lib/api";
 import { signInWithGoogle, signOutFromNewsForMe } from "./lib/auth-client";
 import Settings from "./features/settings/Settings";
+import Newsletter from "./features/newsletter/Newsletter";
 
 type ApiStatus = "checking" | "online" | "offline";
 type AuthStatus = "checking" | "signed-in" | "signed-out" | "unavailable";
@@ -448,6 +449,7 @@ export default function App() {
           <a href="#archive">보관함</a>
           <a href="#topics">관심 주제</a>
           <a href="#settings">연동 설정</a>
+          <a href="#newsletter">메일 브리핑</a>
           <a className="top-nav-cta" href="#topic-form">주제 추가 <span aria-hidden="true">↗</span></a>
         </nav>
         {authUser && !authUser.isDevelopment && (
@@ -515,6 +517,7 @@ export default function App() {
       )}
 
       <Settings />
+      <Newsletter userEmail={authUser?.email ?? ""} />
 
       <section className="scraps-section" id="archive" aria-labelledby="archive-title">
         <div className="section-heading archive-heading">
