@@ -56,7 +56,8 @@ export async function updateTopic(db:D1Database,userId:string,topicId:string,inp
   if(!assignments.length)return getTopic(db,userId,topicId);
   assignments.push("updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')");
   values.push(userId,topicId);
-  await db.prepare(`UPDATE topics SET ${assignments.join(",")} WHERE user_id=? AND id=?`).bind(...values).run();
+  const result=await db.prepare(`UPDATE topics SET ${assignments.join(",")} WHERE user_id=? AND id=?`).bind(...values).run();
+  if((result.meta.changes??0)===0)return null;
   return getTopic(db,userId,topicId);
 }
 export async function deleteTopic(db:D1Database,userId:string,topicId:string):Promise<boolean> {
