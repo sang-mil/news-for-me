@@ -46,6 +46,13 @@ export const FREE_TIER_GEMINI_MODEL_IDS = [
 
 const FREE_MODEL_SET = new Set<string>(FREE_TIER_GEMINI_MODEL_IDS);
 const EXCLUDED_MODEL_PATTERN = /(embedding|tts|image|audio|live|transcri|veo|imagen|lyria|robotics|computer-use)/i;
+const MODEL_CATALOG_TTL_MS = 15 * 60 * 1000;
+const modelCatalogCache = new Map<string, { expiresAt: number; models: GeminiModelOption[] }>();
+
+async function hashApiKey(apiKey: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(apiKey));
+  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
+}
 
 function positiveInteger(value: unknown): number | undefined {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0
@@ -85,6 +92,11 @@ export function parseGeminiModelCatalog(value: unknown): GeminiModelOption[] {
 }
 
 export async function listGeminiModels(apiKey: string): Promise<GeminiModelOption[]> {
+  const cacheKey = await hashApiKey(apiKey);
+  const cached = modelCatalogCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.models.map((model) => ({ ...model }));
+  if (cached) modelCatalogCache.delete(cacheKey);
+
   const models = new Map<string, GeminiModelOption>();
   let pageToken: string | undefined;
 
@@ -127,7 +139,16 @@ export async function listGeminiModels(apiKey: string): Promise<GeminiModelOptio
     if (!pageToken) break;
   }
 
-  return [...models.values()].sort((a, b) => a.id.localeCompare(b.id));
+  const result = [...models.values()].sort((a, b) => a.id.localeCompare(b.id));
+  if (modelCatalogCache.size >= 100) {
+    const oldestKey = modelCatalogCache.keys().next().value;
+    if (oldestKey) modelCatalogCache.delete(oldestKey);
+  }
+  modelCatalogCache.set(cacheKey, {
+    expiresAt: Date.now() + MODEL_CATALOG_TTL_MS,
+    models: result.map((model) => ({ ...model }))
+  });
+  return result;
 }
 
 export function resolveGeminiModelOrder(
@@ -146,7 +167,7 @@ export function resolveGeminiModelOrder(
 
   // If discovery is unavailable or the API returns an empty catalog, keep a
   // small, known-free fallback set so a transient catalog issue does not stop summaries.
-  if (ordered.length === 0) {
+  if (ordered.length === 0 && availableModels.length === 0) {
     return [...FREE_TIER_GEMINI_MODEL_IDS];
   }
   return [...new Set(ordered)];
