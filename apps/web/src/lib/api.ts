@@ -143,6 +143,7 @@ export interface IntegrationConfig {
   modelFallback?: string;
   model?: string;
   allowPaid?: boolean;
+  allowPaidGemini?: boolean;
   projectSlot?: string;
 }
 export interface IntegrationStatus {
@@ -154,6 +155,19 @@ export interface IntegrationStatus {
   lastValidatedAt: string | null;
   platformDefaultAvailable: boolean;
 }
+export interface GeminiModelOption {
+  id: string;
+  displayName: string;
+  isFreeTier: boolean;
+  inputTokenLimit?: number;
+  outputTokenLimit?: number;
+}
+
+export async function getGeminiModels(): Promise<GeminiModelOption[]> {
+  const response = await request<{ data: GeminiModelOption[] }>("/api/integrations/gemini/models");
+  return response.data;
+}
+
 export async function listIntegrations(): Promise<IntegrationStatus[]> {
   const response = await request<{ data: IntegrationStatus[] }>("/api/integrations");
   return response.data;

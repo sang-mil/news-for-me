@@ -1,4 +1,5 @@
 import { jsonResponse } from "../lib/http";
+import { listGeminiModels } from "../services/ai/gemini-models";
 import {
   getUserIntegration,
   isIntegrationProvider,
@@ -41,6 +42,7 @@ function parseConfig(value: unknown): IntegrationConfig {
     ...(typeof input.modelFallback === "string" ? { modelFallback: input.modelFallback.trim() } : {}),
     ...(typeof input.model === "string" ? { model: input.model.trim() } : {}),
     ...(typeof input.allowPaid === "boolean" ? { allowPaid: input.allowPaid } : {}),
+    ...(typeof input.allowPaidGemini === "boolean" ? { allowPaidGemini: input.allowPaidGemini } : {}),
     ...(typeof input.projectSlot === "string" ? { projectSlot: input.projectSlot.trim() } : {})
   };
 }
@@ -73,6 +75,51 @@ export async function handleIntegrationsRequest(
   if (path === "/api/integrations" && request.method === "GET") {
     const data = await listUserIntegrationStatuses(env.DB, userId, platformDefaults(env));
     return jsonResponse({ data }, 200, allowedOrigin);
+  }
+
+  if (path === "/api/integrations/gemini/models" && request.method === "GET") {
+    try {
+      const saved = await getUserIntegration(
+        env.DB, userId, "gemini", env.INTEGRATION_ENCRYPTION_KEY ?? ""
+      );
+      if (saved?.config.enabled === false) {
+        return jsonResponse({ error: "비활성화된 Gemini 연동입니다. 먼저 사용 설정을 켜세요." }, 409, allowedOrigin);
+      }
+
+      const apiKeys = saved
+        ? [saved.credentials.secret]
+        : [env.GEMINI_API_KEY_1, env.GEMINI_API_KEY_2]
+            .filter((value): value is string => Boolean(value?.trim()));
+      if (apiKeys.length === 0) {
+        return jsonResponse({ error: "Gemini API 키를 먼저 저장하거나 서버 기본 키를 설정하세요." }, 400, allowedOrigin);
+      }
+
+      const models = new Map<string, Awaited<ReturnType<typeof listGeminiModels>>[number]>();
+      const errors: string[] = [];
+      for (const apiKey of [...new Set(apiKeys)]) {
+        try {
+          for (const model of await listGeminiModels(apiKey)) models.set(model.id, model);
+        } catch (error) {
+          errors.push(error instanceof Error ? error.message : "Gemini 모델 목록 조회 실패");
+        }
+      }
+
+      if (models.size === 0) {
+        return jsonResponse(
+          { error: errors[0] ?? "이 API 키에서 요약에 사용할 Gemini 모델을 찾지 못했습니다." },
+          502,
+          allowedOrigin
+        );
+      }
+      const data = [...models.values()].sort((a, b) => a.id.localeCompare(b.id));
+      return jsonResponse({ data }, 200, allowedOrigin);
+    } catch (error) {
+      return jsonResponse(
+        { error: error instanceof Error ? error.message : "Gemini 모델 목록을 불러오지 못했습니다." },
+        502,
+        allowedOrigin
+      );
+    }
   }
 
   const match = path.match(/^\/api\/integrations\/([^/]+)(?:\/(test))?$/);

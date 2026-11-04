@@ -4,6 +4,8 @@ import {
   removeIntegration,
   saveIntegration,
   testIntegration,
+  getGeminiModels,
+  type GeminiModelOption,
   type IntegrationConfig,
   type IntegrationProvider,
   type IntegrationStatus
@@ -70,7 +72,7 @@ type ConfigDrafts = Record<IntegrationProvider, IntegrationConfig>;
 type SecretDrafts = Record<IntegrationProvider, string>;
 
 const EMPTY_CONFIGS: ConfigDrafts = {
-  gemini: { enabled: true, modelPrimary: "gemini-3.8-flash", modelFallback: "gemini-3.5-flash-lite" },
+  gemini: { enabled: true, modelPrimary: "gemini-3.8-flash", allowPaidGemini: false },
   openrouter: { enabled: true, model: "openrouter/free", allowPaid: false },
   threads: { enabled: true },
   x: { enabled: true },
@@ -91,6 +93,8 @@ function formatDate(value: string | null): string {
 
 export default function Settings() {
   const [integrations, setIntegrations] = useState<IntegrationStatus[]>([]);
+  const [geminiModels, setGeminiModels] = useState<GeminiModelOption[]>([]);
+  const [geminiModelsError, setGeminiModelsError] = useState("");
   const [configs, setConfigs] = useState<ConfigDrafts>(EMPTY_CONFIGS);
   const [secrets, setSecrets] = useState<SecretDrafts>(EMPTY_SECRETS);
   const [loading, setLoading] = useState(true);
@@ -109,6 +113,23 @@ export default function Settings() {
         for (const row of rows) next[row.provider] = { ...EMPTY_CONFIGS[row.provider], ...row.config };
         return next;
       });
+
+      const geminiStatus = rows.find((row) => row.provider === "gemini");
+      const canLoadGeminiModels = geminiStatus?.configured
+        ? geminiStatus.enabled
+        : geminiStatus?.platformDefaultAvailable === true;
+      if (canLoadGeminiModels) {
+        try {
+          setGeminiModels(await getGeminiModels());
+          setGeminiModelsError("");
+        } catch (modelError) {
+          setGeminiModels([]);
+          setGeminiModelsError(modelError instanceof Error ? modelError.message : "Gemini 모델 목록을 불러오지 못했습니다.");
+        }
+      } else {
+        setGeminiModels([]);
+        setGeminiModelsError("");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "연동 설정을 불러오지 못했습니다.");
     } finally {
@@ -136,6 +157,14 @@ export default function Settings() {
         row
       ]);
       setSecrets((current) => ({ ...current, [provider]: "" }));
+      if (provider === "gemini") {
+        try {
+          setGeminiModels(await getGeminiModels());
+          setGeminiModelsError("");
+        } catch (modelError) {
+          setGeminiModelsError(modelError instanceof Error ? modelError.message : "Gemini 모델 목록을 불러오지 못했습니다.");
+        }
+      }
       setNotice(PROVIDERS.find((item) => item.id === provider)?.title + " 설정을 저장했습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "설정을 저장하지 못했습니다.");
@@ -253,11 +282,36 @@ export default function Settings() {
                     </label>
                     {provider.id === "gemini" && (
                       <div className="integration-subgrid">
-                        <label className="integration-field"><span>기본 모델</span>
-                          <input value={config.modelPrimary ?? ""} onChange={(event) => patchConfig("gemini", { modelPrimary: event.target.value })} placeholder="gemini-3.8-flash" />
+                        <label className="integration-field">
+                          <span>최우선 모델</span>
+                          <select
+                            value={config.modelPrimary ?? ""}
+                            onChange={(event) => patchConfig("gemini", { modelPrimary: event.target.value })}
+                          >
+                            {config.modelPrimary && !geminiModels.some((model) => model.id === config.modelPrimary) && (
+                              <option value={config.modelPrimary}>{config.modelPrimary} (현재 저장된 값)</option>
+                            )}
+                            {geminiModels.map((model) => (
+                              <option
+                                key={model.id}
+                                value={model.id}
+                                disabled={!model.isFreeTier && config.allowPaidGemini !== true}
+                              >
+                                {model.displayName} ({model.id}) · {model.isFreeTier ? "무료 등급 지원" : "유료/요금제 확인 필요"}
+                              </option>
+                            ))}
+                          </select>
+                          <small>선택한 모델을 먼저 사용합니다. 실패하면 이 API 키에서 사용할 수 있는 다른 무료 등급 지원 모델을 자동으로 시도합니다.</small>
+                          <small>무료 등급 지원도 계정의 무료 사용량을 초과하거나 유료 용량으로 전환하면 요금이 발생할 수 있습니다. Google AI Studio에서 사용량과 결제 상태를 확인하세요.</small>
+                          {geminiModelsError && <small>{geminiModelsError}</small>}
                         </label>
-                        <label className="integration-field"><span>대체 모델</span>
-                          <input value={config.modelFallback ?? ""} onChange={(event) => patchConfig("gemini", { modelFallback: event.target.value })} placeholder="gemini-3.5-flash-lite" />
+                        <label className="integration-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={config.allowPaidGemini === true}
+                            onChange={(event) => patchConfig("gemini", { allowPaidGemini: event.target.checked })}
+                          />
+                          <span>유료 또는 요금제 미확인 모델도 자동 대체 후보에 포함</span>
                         </label>
                         <label className="integration-field"><span>Google Cloud 프로젝트 슬롯 (선택)</span>
                           <input value={config.projectSlot ?? ""} onChange={(event) => patchConfig("gemini", { projectSlot: event.target.value })} placeholder="예: personal-project" />

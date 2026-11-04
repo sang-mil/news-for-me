@@ -1,6 +1,7 @@
 ﻿import type { AIEnvironment, ArticleSummaryOutput } from "../types";
 import { AIProviderError } from "../types";
 import { callGemini } from "../providers/gemini";
+import { GeminiModelCatalogError, listGeminiModels, resolveGeminiModelOrder, type GeminiModelOption } from "../gemini-models";
 import { callOpenRouter } from "../providers/openrouter";
 
 export interface RoutedSummaryResult {
@@ -94,10 +95,7 @@ export async function routeSummaryRequest(
   prompt: string,
   expectedIds: Set<string>
 ): Promise<RoutedSummaryResult> {
-  const models = [...new Set([
-    env.GEMINI_MODEL_PRIMARY?.trim() || "gemini-3.8-flash",
-    env.GEMINI_MODEL_FALLBACK?.trim() || "gemini-3.5-flash-lite"
-  ])];
+  const allowPaidGemini = env.GEMINI_ALLOW_PAID_MODELS?.trim().toLowerCase() === "true";
   const keys = [
     { key: env.GEMINI_API_KEY_1?.trim(), slot: "gemini-key-1", project: env.GEMINI_PROJECT_SLOT_1?.trim() || null },
     { key: env.GEMINI_API_KEY_2?.trim(), slot: "gemini-key-2", project: env.GEMINI_PROJECT_SLOT_2?.trim() || null }
@@ -112,11 +110,43 @@ export async function routeSummaryRequest(
   const invalidKeys = new Set<string>();
   let lastError: AIProviderError | null = null;
 
-  // Key 1: primary model -> fallback model. Then key 2: same model order.
+  // For each eligible key, prefer the selected Gemini model then walk the discovered model catalog.
   for (const key of keys) {
     if (key.slot === "gemini-key-2" && skipKey2AfterQuota) continue;
     if (invalidKeys.has(key.slot)) continue;
 
+    let availableModels: GeminiModelOption[] = [];
+    try {
+      availableModels = await listGeminiModels(key.key);
+    } catch (error) {
+      const catalogError = error instanceof GeminiModelCatalogError
+        ? error
+        : new GeminiModelCatalogError(
+            error instanceof Error ? error.message : "Gemini model catalog error",
+            503,
+            "catalog_error"
+          );
+      const failure = new AIProviderError(
+        catalogError.message,
+        catalogError.status,
+        catalogError.code
+      );
+      lastError = failure;
+      attempt++;
+      await logAttempt(db, runId, "gemini", "models.list", key.slot, attempt,
+        "failed", failure.status, failure.code, failure.message, 0, null);
+      if (failure.status === 401 || failure.status === 403) invalidKeys.add(key.slot);
+      if (failure.status === 429 && sameOrUnknownProject) skipKey2AfterQuota = true;
+      console.warn("Gemini model discovery failed", key.slot, failure.status, failure.code);
+    }
+    if (invalidKeys.has(key.slot)) continue;
+
+    const models = resolveGeminiModelOrder(
+      availableModels,
+      env.GEMINI_MODEL_PRIMARY,
+      env.GEMINI_MODEL_FALLBACK,
+      allowPaidGemini
+    );
     for (const model of models) {
       attempt++;
       const started = Date.now();

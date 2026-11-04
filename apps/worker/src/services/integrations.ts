@@ -6,6 +6,7 @@ export interface IntegrationConfig {
   modelFallback?: string;
   model?: string;
   allowPaid?: boolean;
+  allowPaidGemini?: boolean;
   projectSlot?: string;
 }
 
@@ -178,6 +179,7 @@ export async function saveUserIntegration(
     ...(config.modelFallback ? { modelFallback: config.modelFallback.slice(0, 120) } : {}),
     ...(config.model ? { model: config.model.slice(0, 160) } : {}),
     ...(typeof config.allowPaid === "boolean" ? { allowPaid: config.allowPaid } : {}),
+    ...(typeof config.allowPaidGemini === "boolean" ? { allowPaidGemini: config.allowPaidGemini } : {}),
     ...(config.projectSlot ? { projectSlot: config.projectSlot.slice(0, 120) } : {})
   };
   await db.prepare(

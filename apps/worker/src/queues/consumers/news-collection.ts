@@ -74,6 +74,9 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
     GEMINI_PROJECT_SLOT_2: geminiIntegration ? undefined : env.GEMINI_PROJECT_SLOT_2,
     GEMINI_MODEL_PRIMARY: geminiIntegration?.config.modelPrimary ?? env.GEMINI_MODEL_PRIMARY,
     GEMINI_MODEL_FALLBACK: geminiIntegration?.config.modelFallback ?? env.GEMINI_MODEL_FALLBACK,
+    GEMINI_ALLOW_PAID_MODELS: geminiIntegration
+      ? (geminiIntegration.config.allowPaidGemini === true ? "true" : "false")
+      : env.GEMINI_ALLOW_PAID_MODELS,
     OPENROUTER_API_KEY: useSavedSecret(openRouterIntegration, env.OPENROUTER_API_KEY),
     OPENROUTER_MODEL: openRouterIntegration?.config.model ?? env.OPENROUTER_MODEL,
     OPENROUTER_ALLOW_PAID: openRouterIntegration
