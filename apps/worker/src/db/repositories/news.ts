@@ -49,7 +49,6 @@ function toCollectionRun(row: CollectionRunRow): CollectionRun {
 
 export async function getTopicForCollection(
   db: D1Database,
-  userId: string,
   topicId: string
 ): Promise<TopicForCollection | null> {
   return db.prepare(`
@@ -193,8 +192,8 @@ export async function storeCollectedArticles(
     UPDATE topics
     SET last_collected_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
       updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-    WHERE id = ? AND user_id = ?
-  `).bind(job.topicId, job.userId));
+    WHERE id = ?
+  `).bind(job.topicId));
 
   await db.batch(statements);
   return stored;
