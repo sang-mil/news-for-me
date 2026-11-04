@@ -10,6 +10,7 @@ export interface AIEnvironment {
   GEMINI_PROJECT_SLOT_2?: string;
   GEMINI_MODEL_PRIMARY?: string;
   GEMINI_MODEL_FALLBACK?: string;
+  GEMINI_ALLOW_PAID_MODELS?: string;
   OPENROUTER_API_KEY?: string;
   OPENROUTER_MODEL?: string;
   OPENROUTER_ALLOW_PAID?: string;
