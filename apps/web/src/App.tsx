@@ -188,6 +188,11 @@ export default function App() {
     }
   }
   async function loadArticles(topicId: string) {
+    if (expandedTopicId === topicId) {
+      setExpandedTopicId(null);
+      return;
+    }
+
     setExpandedTopicId(topicId);
     try {
       const articles = await listTopicArticles(topicId);
@@ -670,7 +675,7 @@ export default function App() {
                         </div>
                       )}
                       {expandedTopicId === topic.id && (
-                        <div className="article-list">
+                        <div className="article-list" id={`articles-${topic.id}`}>
                           <div className="article-list-heading">최근 수집 기사</div>
                           {!articles || articles.length === 0 ? <p className="article-empty">저장된 기사가 없습니다. 뉴스 수집을 실행해 보세요.</p> : articles.map((article) => {
                             const isScrapped = scraps.some((saved) => saved.id === article.id);
@@ -698,7 +703,15 @@ export default function App() {
                         </select>
                       </label>
                       <button type="button" className="icon-button collect-button" onClick={() => void handleCollect(topic)} disabled={collectingTopicId !== null || status !== "online"}>{collectingTopicId === topic.id ? "수집 중…" : "뉴스 수집"}</button>
-                      <button type="button" className="icon-button" onClick={() => void loadArticles(topic.id)}>기사 보기</button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        onClick={() => void loadArticles(topic.id)}
+                        aria-expanded={expandedTopicId === topic.id}
+                        aria-controls={`articles-${topic.id}`}
+                      >
+                        {expandedTopicId === topic.id ? "기사 접기" : "기사 보기"}
+                      </button>
                       <button type="button" className="icon-button" onClick={() => startEdit(topic)}>수정</button>
                       <button type="button" className="icon-button danger" onClick={() => void handleDelete(topic)}>삭제</button>
                     </div>
