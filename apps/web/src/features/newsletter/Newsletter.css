@@ -197,3 +197,164 @@
     height: 580px;
   }
 }
+
+.newsletter-schedule-panel {
+  margin: 22px 0 18px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 15px;
+  background: #fbfdff;
+}
+.newsletter-schedule-heading,
+.newsletter-schedule-form,
+.newsletter-schedule-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.newsletter-schedule-heading > div,
+.newsletter-schedule-info {
+  display: grid;
+  gap: 5px;
+}
+.newsletter-schedule-heading strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+.newsletter-schedule-heading span,
+.newsletter-schedule-info span,
+.newsletter-schedule-hint,
+.newsletter-schedule-empty {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.newsletter-schedule-refresh,
+.newsletter-schedule-cancel {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.newsletter-schedule-refresh:disabled {
+  cursor: wait;
+  opacity: .55;
+}
+.newsletter-schedule-form {
+  align-items: flex-end;
+  justify-content: flex-start;
+  margin-top: 16px;
+}
+.newsletter-schedule-form label {
+  display: grid;
+  gap: 7px;
+  width: min(100%, 330px);
+}
+.newsletter-schedule-form label > span {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+.newsletter-schedule-form input {
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 13px;
+}
+.newsletter-schedule-button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid #0f766e;
+  border-radius: 9px;
+  background: #0f766e;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.newsletter-schedule-button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+.newsletter-schedule-hint {
+  margin: 9px 0 0;
+}
+.newsletter-schedule-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+.newsletter-schedule-item {
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+.newsletter-schedule-info {
+  min-width: 0;
+}
+.newsletter-schedule-info strong {
+  color: #0f172a;
+  font-size: 12px;
+}
+.newsletter-schedule-info small {
+  color: #be123c;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.newsletter-schedule-status {
+  width: fit-content;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569 !important;
+  font-weight: 700;
+}
+.newsletter-schedule-status.is-sent {
+  background: #ecfdf5;
+  color: #047857 !important;
+}
+.newsletter-schedule-status.is-failed {
+  background: #fff1f2;
+  color: #be123c !important;
+}
+.newsletter-schedule-status.is-cancelled {
+  background: #f1f5f9;
+  color: #64748b !important;
+}
+.newsletter-schedule-empty {
+  margin-top: 12px;
+  padding: 13px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 9px;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .newsletter-schedule-heading,
+  .newsletter-schedule-form,
+  .newsletter-schedule-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .newsletter-schedule-form label {
+    width: 100%;
+  }
+  .newsletter-schedule-refresh,
+  .newsletter-schedule-cancel,
+  .newsletter-schedule-button {
+    width: 100%;
+  }
+}
