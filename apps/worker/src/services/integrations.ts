@@ -37,8 +37,8 @@ const PROVIDERS: IntegrationProvider[] = ["gemini", "openrouter", "threads", "x"
 
 export function isMissingUserIntegrationsTableError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? "");
-  return /no such table:\\s*user_integrations/i.test(message) ||
-    /(?:table|relation)\\s+["'`]?user_integrations["'`]?\\s+(?:does not exist|not found)/i.test(message);
+  return /no such table:\s*user_integrations/i.test(message) ||
+    /(?:table|relation)\s+["'`]?user_integrations["'`]?\s+(?:does not exist|not found)/i.test(message);
 }
 
 export function isIntegrationProvider(value: string): value is IntegrationProvider {
