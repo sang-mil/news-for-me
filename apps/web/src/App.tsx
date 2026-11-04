@@ -361,7 +361,9 @@ export default function App() {
           const articles = await listTopicArticles(topic.id);
           setArticlesByTopic((current) => ({ ...current, [topic.id]: articles }));
           setExpandedTopicId(topic.id);
-          setTopics(await listTopics());
+          const refreshedTopics = await listTopics(topicPagination.page, 5);
+          setTopics(refreshedTopics.data);
+          setTopicPagination(refreshedTopics.pagination);
           if (run.articlesFound === 0) {
             console.warn("[NewsForMe][Collection] completed with zero articles", {
               runId, topicId: topic.id, topicName: topic.name
