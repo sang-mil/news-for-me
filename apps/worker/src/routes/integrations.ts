@@ -65,7 +65,7 @@ async function readResponseOk(response: Response): Promise<void> {
   if (!response.ok) throw new Error("연결 실패 (HTTP " + response.status + "). 키와 API 권한을 확인하세요.");
 }
 
-async function testCredential(
+export async function testCredential(
   provider: IntegrationProvider,
   secret: string
 ): Promise<void> {
@@ -76,7 +76,9 @@ async function testCredential(
     url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1";
     headers["x-goog-api-key"] = secret;
   } else if (provider === "openrouter") {
-    url = "https://openrouter.ai/api/v1/models";
+    // /models is a public catalog endpoint and does not prove that a key is valid.
+    // /key requires authentication and returns metadata for the presented key.
+    url = "https://openrouter.ai/api/v1/key";
     headers.Authorization = "Bearer " + secret;
   } else if (provider === "threads") {
     url = "https://graph.threads.net/v1.0/keyword_search?q=news&search_type=RECENT&search_mode=KEYWORD&limit=10&fields=id";
