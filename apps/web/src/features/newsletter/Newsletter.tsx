@@ -72,7 +72,8 @@ export default function Newsletter({ userEmail }: NewsletterProps) {
   const [notice, setNotice] = useState("");
   const normalizedRecipient = recipientEmail.trim().toLowerCase();
   const isRecipientValid = normalizedRecipient.length <= 254 && EMAIL_RE.test(normalizedRecipient);
-  const minimumScheduleValue = toSeoulDateTimeInput(new Date(Date.now() + 5 * 60 * 1000));
+  const minimumScheduleTime = Math.ceil((Date.now() + 5 * 60 * 1000) / 60000) * 60000;
+  const minimumScheduleValue = toSeoulDateTimeInput(new Date(minimumScheduleTime));
   const maximumScheduleValue = toSeoulDateTimeInput(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
 
   useEffect(() => {
