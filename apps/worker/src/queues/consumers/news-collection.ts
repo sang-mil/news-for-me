@@ -12,6 +12,8 @@ import { createXPostsSource } from "../../services/news/sources/x";
 import { createThreadsPostsSource } from "../../services/news/sources/threads";
 import { isSoftwareOrTechTopic } from "../../services/news/relevance";
 import { summarizeCollectedArticles } from "../../services/ai/summarizer";
+import { refreshInterestProfile } from "../../services/ai/interest-profile";
+import { getInterestProfile } from "../../db/repositories/personalization";
 import type { AIEnvironment } from "../../services/ai/types";
 import type { CollectionJobMessage, NewsSource } from "../../services/news/types";
 import { getUserIntegration, type IntegrationProvider } from "../../services/integrations";
@@ -56,7 +58,7 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
   if (!topic) throw new Error("Topic no longer exists or is inactive.");
 
   const maxArticles = Math.min(30, Math.max(5, Math.floor(job.maxArticles ?? 10)));
-  const searchInput = { topicName: topic.name, includeKeywords: parseKeywords(topic.include_keywords_json), excludeKeywords: parseKeywords(topic.exclude_keywords_json), maxResults: maxArticles };
+  const baseSearchInput = { topicName: topic.name, includeKeywords: parseKeywords(topic.include_keywords_json), excludeKeywords: parseKeywords(topic.exclude_keywords_json), maxResults: maxArticles };
 
   const [geminiIntegration, openRouterIntegration, youtubeIntegration, xIntegration, threadsIntegration] = await Promise.all([
     loadIntegration(env.DB, job.userId, "gemini", env.INTEGRATION_ENCRYPTION_KEY),
@@ -83,6 +85,28 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
       ? (openRouterIntegration.config.allowPaid === true ? "true" : "false")
       : env.OPENROUTER_ALLOW_PAID
   };
+
+  // The app records user behavior; Gemini periodically converts it into search hints.
+  // A profile failure must never stop ordinary RSS/news collection.
+  try {
+    await refreshInterestProfile(env.DB, job.userId, aiEnvironment, false);
+  } catch (error) {
+    console.warn("[NewsForMe][Personalization] profile refresh skipped", {
+      userId: job.userId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+  const profile = await getInterestProfile(env.DB, job.userId);
+  const searchInput = {
+    ...baseSearchInput,
+    includeKeywords: [...new Set([...baseSearchInput.includeKeywords, ...profile.searchKeywords])].slice(0, 20),
+    excludeKeywords: [...new Set([...baseSearchInput.excludeKeywords, ...profile.excludeKeywords])].slice(0, 15)
+  };
+  console.info("[NewsForMe][Personalization] search hints applied", {
+    userId: job.userId,
+    includeHintCount: profile.searchKeywords.length,
+    excludeHintCount: profile.excludeKeywords.length
+  });
 
   const youtubeApiKey = useSavedSecret(youtubeIntegration, env.YOUTUBE_API_KEY);
   const xBearerToken = useSavedSecret(xIntegration, env.X_BEARER_TOKEN);

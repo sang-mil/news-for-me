@@ -91,6 +91,7 @@ export async function getCollectionRun(
 export async function listTopicArticles(
   db: D1Database,
   topicId: string,
+  userId: string,
   limit = 20
 ): Promise<NewsArticle[]> {
   const result = await db.prepare(`
@@ -102,9 +103,21 @@ export async function listTopicArticles(
     INNER JOIN topic_articles ta ON ta.article_id = a.id
     INNER JOIN topics t ON t.id = ta.topic_id
     WHERE ta.topic_id = ?
+      AND ta.linked_at > COALESCE((
+        SELECT cleared_at FROM user_topic_feed_state
+        WHERE user_id = ? AND topic_id = ?
+      ), '1970-01-01T00:00:00.000Z')
+      AND NOT EXISTS (
+        SELECT 1 FROM article_user_events e
+        WHERE e.user_id = ? AND e.article_id = a.id AND e.event_type = 'opened'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM article_saves saved
+        WHERE saved.user_id = ? AND saved.article_id = a.id
+      )
     ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
     LIMIT ?
-  `).bind(topicId, limit).all<ArticleRow>();
+  `).bind(topicId, userId, topicId, userId, userId, limit).all<ArticleRow>();
 
   return result.results.map((row) => ({
     id: row.id,
