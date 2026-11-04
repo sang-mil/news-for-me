@@ -55,8 +55,12 @@ export default function Newsletter({ userEmail }: NewsletterProps) {
 
   async function handleSend() {
     if (!preview || sending) return;
+    if (!isRecipientValid) {
+      setError("받는 사람 이메일 주소를 올바르게 입력하세요.");
+      return;
+    }
     const confirmed = window.confirm(
-      `최근 ${preview.periodDays}일의 AI 요약 뉴스 ${preview.articleCount}개를 아래 주소로 지금 발송합니다.\n\n수신: ${userEmail}\n\n계속할까요?`
+      `최근 ${preview.periodDays}일의 AI 요약 뉴스 ${preview.articleCount}개를 아래 주소로 지금 발송합니다.\n\n수신: ${normalizedRecipient}\n\n계속할까요?`
     );
     if (!confirmed) return;
 
