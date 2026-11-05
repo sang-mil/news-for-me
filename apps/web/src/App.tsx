@@ -21,8 +21,11 @@ interface TopicFormState {
   description: string;
   includeKeywords: string;
   excludeKeywords: string;
+  isPublic: boolean;
 }
-const EMPTY_FORM: TopicFormState = { name: "", description: "", includeKeywords: "", excludeKeywords: "" };
+const EMPTY_FORM: TopicFormState = {
+  name: "", description: "", includeKeywords: "", excludeKeywords: "", isPublic: false
+};
 
 function splitKeywords(value: string): string[] {
   return [...new Set(value.split(/[，,\n]/).map((item) => item.trim()).filter(Boolean))];
@@ -32,7 +35,8 @@ function toInput(form: TopicFormState): TopicInput {
     name: form.name.trim(),
     description: form.description.trim() || null,
     includeKeywords: splitKeywords(form.includeKeywords),
-    excludeKeywords: splitKeywords(form.excludeKeywords)
+    excludeKeywords: splitKeywords(form.excludeKeywords),
+    isPublic: form.isPublic
   };
 }
 function formatDate(value: string | null): string {
@@ -162,7 +166,8 @@ export default function App() {
       name: topic.name,
       description: topic.description ?? "",
       includeKeywords: topic.includeKeywords.join(", "),
-      excludeKeywords: topic.excludeKeywords.join(", ")
+      excludeKeywords: topic.excludeKeywords.join(", "),
+      isPublic: topic.isPublic
     });
     setNotice("");
     setError("");
@@ -605,7 +610,7 @@ export default function App() {
           <div className="section-heading topics-heading">
             <div><div className="section-kicker">YOUR TOPICS</div><h2 id="topics-title">관심 주제와 최신 뉴스</h2></div>
             <div className="section-heading-actions">
-              <span className="count-badge">{topicPagination.totalItems}개 공개 주제</span>
+              <span className="count-badge">내가 볼 수 있는 주제 {topicPagination.totalItems}개</span>
               <span className="count-badge">내 주제 {topicPagination.ownedCount}/3</span>
               {topicPagination.ownedCount<3 && <a className="section-action-link" href="#topic-form">주제 추가 <span aria-hidden="true">＋</span></a>}
             </div>
@@ -623,15 +628,21 @@ export default function App() {
                 return (
                   <article className="topic-card" key={topic.id}>
                     <div className="topic-card-main">
-                      <div className="topic-card-title-row"><h3>{topic.name}</h3><span className="topic-date">{formatDate(topic.createdAt)}</span></div>
-                    <div className="topic-creator">작성자 · {topic.createdByName}</div>
+                      <div className="topic-card-title-row">
+                        <h3>{topic.name}</h3>
+                        <span className={"topic-visibility-pill " + (topic.isPublic ? "is-public" : "is-private")}>
+                          {topic.isPublic ? "공개" : "비공개"}
+                        </span>
+                        <span className="topic-date">{formatDate(topic.createdAt)}</span>
+                      </div>
+                      {topic.isPublic && <div className="topic-creator">작성자 · {topic.createdByName}</div>}
                       {topic.description && <p className="topic-description">{topic.description}</p>}
                       <div className="keyword-groups">
                         {topic.includeKeywords.length > 0 && <div className="keyword-row"><span className="keyword-label">포함</span>{topic.includeKeywords.map((keyword) => <span className="keyword-chip" key={`in-${keyword}`}>{keyword}</span>)}</div>}
                         {topic.excludeKeywords.length > 0 && <div className="keyword-row"><span className="keyword-label excluded">제외</span>{topic.excludeKeywords.map((keyword) => <span className="keyword-chip keyword-chip-muted" key={`out-${keyword}`}>{keyword}</span>)}</div>}
                         {topic.includeKeywords.length === 0 && topic.excludeKeywords.length === 0 && <span className="keyword-hint">키워드 조건 없음</span>}
                       </div>
-                      {run && (
+                      {topic.isOwner && run && (
                         <div className="collection-status" aria-live="polite">
                           <div>최근 수집 작업: {run.status} · {run.articlesFound}건</div>
                           {run.errorMessage && (
@@ -641,7 +652,7 @@ export default function App() {
                           )}
                         </div>
                       )}
-                      {expandedTopicId === topic.id && (
+                      {topic.isOwner && expandedTopicId === topic.id && (
                         <div className="article-list" id={`articles-${topic.id}`}>
                           <div className="article-list-heading article-list-toolbar">
                             <span>새로 수집한 기사</span>
@@ -673,26 +684,26 @@ export default function App() {
                       )}
                     </div>
                     <div className="topic-actions topic-actions-column">
-                      <label className="collection-limit-control">
-                        수집 개수
-                        <select value={collectionLimit} onChange={(event) => setCollectionLimit(Number(event.target.value))} aria-label="수집할 뉴스 개수" disabled={collectingTopicId !== null}>
-                          {[5, 10, 15, 20, 30].map((count) => <option key={count} value={count}>{count}개</option>)}
-                        </select>
-                      </label>
-                      <button type="button" className="icon-button collect-button" onClick={() => void handleCollect(topic)} disabled={collectingTopicId !== null || status !== "online"}>{collectingTopicId === topic.id ? "수집 중…" : "새로고침"}</button>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        onClick={() => void loadArticles(topic.id)}
-                        aria-expanded={expandedTopicId === topic.id}
-                        aria-controls={`articles-${topic.id}`}
-                      >
-                        {expandedTopicId === topic.id ? "기사 접기" : "기사 보기"}
-                      </button>
-                      {topic.isOwner && <>
+                      {topic.isOwner ? <>
+                        <label className="collection-limit-control">
+                          수집 개수
+                          <select value={collectionLimit} onChange={(event) => setCollectionLimit(Number(event.target.value))} aria-label="수집할 뉴스 개수" disabled={collectingTopicId !== null}>
+                            {[5, 10, 15, 20, 30].map((count) => <option key={count} value={count}>{count}개</option>)}
+                          </select>
+                        </label>
+                        <button type="button" className="icon-button collect-button" onClick={() => void handleCollect(topic)} disabled={collectingTopicId !== null || status !== "online"}>{collectingTopicId === topic.id ? "수집 중…" : "새로고침"}</button>
+                        <button
+                          type="button"
+                          className="icon-button"
+                          onClick={() => void loadArticles(topic.id)}
+                          aria-expanded={expandedTopicId === topic.id}
+                          aria-controls={`articles-${topic.id}`}
+                        >
+                          {expandedTopicId === topic.id ? "기사 접기" : "기사 보기"}
+                        </button>
                         <button type="button" className="icon-button" onClick={() => startEdit(topic)}>수정</button>
                         <button type="button" className="icon-button danger" onClick={() => void handleDelete(topic)}>삭제</button>
-                      </>}
+                      </> : <span className="public-topic-note">공개 주제 정보 · 기사와 스크랩은 작성자 계정에서만 관리됩니다.</span>}
                     </div>
                   </article>
                 );
@@ -720,13 +731,24 @@ export default function App() {
             <input id="include-keywords" className="text-input" type="text" placeholder="신제품, 실적, AI 모델" value={form.includeKeywords} onChange={(event) => setForm({ ...form, includeKeywords: event.target.value })} />
             <label className="field-label" htmlFor="exclude-keywords">제외 키워드 <span className="optional">선택 · 쉼표로 구분</span></label>
             <input id="exclude-keywords" className="text-input" type="text" placeholder="주가 전망, 광고" value={form.excludeKeywords} onChange={(event) => setForm({ ...form, excludeKeywords: event.target.value })} />
-            <p className="field-help">키워드는 각각 최대 20개까지 등록할 수 있어요.</p>
+            <label className="topic-visibility-toggle">
+              <input
+                type="checkbox"
+                checked={form.isPublic}
+                onChange={(event) => setForm({ ...form, isPublic: event.target.checked })}
+              />
+              <span>
+                <strong>다른 사용자에게 주제 공개</strong>
+                <small>공개하면 주제명·설명·키워드·작성자 이름이 다른 계정에 표시됩니다. 기사 피드와 스크랩은 계속 본인에게만 보입니다.</small>
+              </span>
+            </label>
+            <p className="field-help">기본값은 비공개입니다. 키워드는 각각 최대 20개까지 등록할 수 있어요.</p>
             {!editingId && topicPagination.ownedCount>=3 && <p className="field-help" role="status">계정당 관심 주제는 최대 3개까지 만들 수 있어요.</p>}
             <button className="submit-button" type="submit" disabled={isSaving || status!=="online" || (!editingId && topicPagination.ownedCount>=3)}>
               {isSaving?"저장 중…":editingId?"변경사항 저장":"관심 항목 등록"}<span aria-hidden="true">→</span>
             </button>
           </form>
-          <div className="privacy-note"><span>⌑</span> 로그인한 계정별로 설정과 데이터가 분리되어 저장됩니다.</div>
+          <div className="privacy-note"><span>⌑</span> 비공개 주제는 본인에게만 표시됩니다. 공개 여부는 언제든 수정할 수 있습니다.</div>
         </aside>
       </section>
 
