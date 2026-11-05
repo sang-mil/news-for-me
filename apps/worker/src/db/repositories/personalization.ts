@@ -85,7 +85,7 @@ export async function getInterestProfile(
       LIMIT 1
     `).bind(userId).first<ProfileRow>(),
     db.prepare(
-      "SELECT COUNT(*) AS count FROM article_user_events WHERE user_id = ?"
+      "SELECT COUNT(*) AS count FROM article_user_events WHERE user_id = ? AND (article_id IS NULL OR article_id NOT IN (SELECT id FROM articles WHERE provider = 'youtube-data-api'))"
     ).bind(userId).first<CountRow>()
   ]);
 
