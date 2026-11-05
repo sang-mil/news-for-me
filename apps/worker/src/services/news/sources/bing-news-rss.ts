@@ -2,7 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 import type {
   CollectedNewsItem, NewsSearchInput, SourceSearchDiagnostics
 } from "../types";
-import { matchesTopicRelevance } from "../relevance";
+import { matchesTopicRelevance } from "../relevance.ts";
 
 const parser = new XMLParser({
   ignoreAttributes: false,
