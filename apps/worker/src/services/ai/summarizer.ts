@@ -6,21 +6,10 @@ import type { StoredCollectedArticle } from "../news/types";
 import type { AIEnvironment } from "./types";
 import { hasAIProviderConfigured } from "./types";
 import { routeSummaryRequest } from "./policies/fallback";
+import { selectSummarizableArticles } from "./summarization-filter.ts";
 
 const PROMPT_VERSION = "v1";
 const BATCH_SIZE = 8;
-
-export function selectSummarizableArticles(
-  storedArticles: StoredCollectedArticle[]
-): StoredCollectedArticle[] {
-  const unique = new Map<string, StoredCollectedArticle>();
-  for (const article of storedArticles) {
-    if (article.item.provider !== "youtube-data-api") {
-      unique.set(article.articleId, article);
-    }
-  }
-  return [...unique.values()];
-}
 
 export async function summarizeCollectedArticles(
   db: D1Database,
