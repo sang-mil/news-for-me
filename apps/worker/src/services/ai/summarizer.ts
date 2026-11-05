@@ -23,7 +23,9 @@ export async function summarizeCollectedArticles(
   }
 
   const unique = new Map<string, StoredCollectedArticle>();
-  for (const article of storedArticles) unique.set(article.articleId, article);
+  for (const article of storedArticles) {
+    if (article.item.provider !== "youtube-data-api") unique.set(article.articleId, article);
+  }
   const articleList = [...unique.values()];
 
   const pendingIds = await findUnsummarizedArticleIds(
