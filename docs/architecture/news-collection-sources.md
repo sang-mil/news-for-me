@@ -7,7 +7,6 @@
 | Google News RSS | None | Korean Google News RSS search | Retries transient HTTP 429/5xx responses up to two times after the first request. Google may still return an HTML interstitial or HTTP 503. |
 | Bing News RSS | None | News search RSS | When the first query returns fewer than requested, it retries with the topic-only query and merges non-duplicate results. This is an unofficial RSS surface and may change. |
 | GDELT DOC API | None | Additional global news articles | Searches the last seven days across multilingual coverage. Uses topic/include terms first, then the topic-only query if the target is not reached. It does not discard a valid content-level match solely because the headline omits the term. |
-| Naver News Search API | Naver application credentials | Korean news search | Optional. Enable by adding both Worker secrets below. Uses one query per topic/include term, up to five terms. |
 | YouTube Data API | Existing YouTube integration or Worker secret | Related video results | Video results count toward the requested collection maximum. |
 | GitHub Search | Public API | Repository discovery for software/technology topics | Skipped for unrelated topics. |
 | V2EX Public API | Public API | Developer discussions for software/technology topics | Skipped for unrelated topics. |
