@@ -24,6 +24,7 @@ export interface SourceSearchDiagnostics {
   fetchedCount: number;
   acceptedCount: number;
   rejected: Record<string, number>;
+  observations?: Record<string, number>;
   attempts?: string[];
 }
 export interface NewsSourceSearchResult {
