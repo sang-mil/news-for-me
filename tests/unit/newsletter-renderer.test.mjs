@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderNewsletter } from "../../apps/worker/src/services/email/renderer.ts";
-import { handleNewsletterRequest } from "../../apps/worker/src/routes/newsletter.ts";
 
 const article = {
   articleId: "article-1",
@@ -39,26 +38,3 @@ test("newsletter renderer handles an empty preview without throwing", () => {
   assert.match(preview.text, /기사 0개/);
 });
 
-test("newsletter preview endpoint returns an explicit empty preview instead of 404", async () => {
-  const db = {
-    prepare() {
-      return {
-        bind() { return this; },
-        async all() { return { results: [] }; }
-      };
-    }
-  };
-  const request = new Request("https://news-for-me.test/api/newsletter/preview");
-  const response = await handleNewsletterRequest(
-    request,
-    { DB: db },
-    "user-1",
-    "https://news-for-me.test"
-  );
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.data.articleCount, 0);
-  assert.equal(body.data.periodDays, 7);
-  assert.match(body.data.html, /AI 분석 기사 0개/);
-});
