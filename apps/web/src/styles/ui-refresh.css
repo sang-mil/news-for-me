@@ -2000,3 +2000,53 @@ button:not(:disabled) {
 .topic-pagination button{border:1px solid var(--line,#dbe3dc);border-radius:999px;background:var(--surface,#fff);color:inherit;padding:.45rem .9rem;cursor:pointer}
 .topic-pagination button:disabled{opacity:.4;cursor:not-allowed}
 .topic-pagination span{color:var(--muted,#64748b);font-size:.85rem;font-variant-numeric:tabular-nums}
+
+
+/* Topic visibility controls */
+.topic-visibility-setting {
+  display: grid;
+  gap: 7px;
+  margin: 4px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #dbe4ef;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.topic-visibility-setting label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.topic-visibility-setting input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #2563eb;
+}
+.topic-visibility-setting p {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.65;
+}
+.topic-visibility-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.topic-visibility-badge.is-private {
+  background: #f1f5f9;
+  color: #475569;
+}
+.topic-visibility-badge.is-public {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
