@@ -172,9 +172,13 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
       const rejected = Object.entries(diagnostic.rejected)
         .map(([reason, count]) => reason + ":" + count)
         .join(",");
+      const observations = Object.entries(diagnostic.observations ?? {})
+        .map(([reason, count]) => reason + ":" + count)
+        .join(",");
       return [id + "[fetched:" + diagnostic.fetchedCount
         + ",accepted:" + diagnostic.acceptedCount
-        + (rejected ? ",rejected:" + rejected : "") + "]"];
+        + (rejected ? ",rejected:" + rejected : "")
+        + (observations ? ",observed:" + observations : "") + "]"];
     })
     .join(" ");
   const shortfall = Math.max(0, maxArticles - collection.items.length);
