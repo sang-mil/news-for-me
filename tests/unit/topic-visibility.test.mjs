@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { listTopics, getTopic } from "../../apps/worker/src/db/repositories/topics.ts";
+import { getTopicForCollection, getCollectionRun } from "../../apps/worker/src/db/repositories/news.ts";
 
 function createDbMock() {
   const calls = [];
@@ -17,7 +18,7 @@ function createDbMock() {
           return { results: [] };
         },
         async first() {
-          return { count: 2 };
+          return call.sql.includes("COUNT(*)") ? { count: 2 } : null;
         }
       };
       return statement;
@@ -49,4 +50,16 @@ test("individual topic lookup excludes another user's private topics", async () 
   assert.equal(topic, null);
   assert.match(query.sql, /WHERE t\.id=\? AND \(t\.user_id=\? OR t\.is_public=1\)/);
   assert.deepEqual(query.values, ["viewer-1", "topic-private", "viewer-1"]);
+});
+
+test("collection routes and jobs require the owning account", async () => {
+  const { db, calls } = createDbMock();
+
+  await getTopicForCollection(db, "topic-1", "owner-1");
+  await getCollectionRun(db, "topic-1", "run-1", "owner-1");
+
+  assert.match(calls[0].sql, /WHERE id = \? AND user_id = \? AND is_active = 1/);
+  assert.deepEqual(calls[0].values, ["topic-1", "owner-1"]);
+  assert.match(calls[1].sql, /WHERE cr\.id = \? AND cr\.topic_id = \? AND t\.user_id = \?/);
+  assert.deepEqual(calls[1].values, ["run-1", "topic-1", "owner-1"]);
 });
