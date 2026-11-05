@@ -85,3 +85,13 @@ export interface SavedNewsArticle extends NewsArticle {
   updatedAt: string;
   tags: SavedNewsTag[];
 }
+
+export interface InterestProfile {
+  markdown: string | null;
+  searchKeywords: string[];
+  excludeKeywords: string[];
+  analyzedEventCount: number;
+  totalEventCount: number;
+  analyzedAt: string | null;
+  modelName: string | null;
+}

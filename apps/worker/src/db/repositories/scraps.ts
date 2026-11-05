@@ -105,9 +105,9 @@ export async function saveArticleForUser(
     INSERT OR IGNORE INTO article_saves (user_id, article_id, updated_at)
     SELECT ?, a.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
     FROM articles a
-    INNER JOIN topic_articles ta ON ta.article_id = a.id
-    WHERE a.id = ? AND ta.topic_id = ?
-  `).bind(userId, articleId, topicId).run();
+    INNER JOIN user_topic_articles uta ON uta.article_id = a.id
+    WHERE a.id = ? AND uta.topic_id = ? AND uta.user_id = ?
+  `).bind(userId, articleId, topicId, userId).run();
 
   const row = await db.prepare(`
     SELECT a.id, a.title, a.canonical_url, a.source_name,

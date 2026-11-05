@@ -227,6 +227,8 @@ export default function Settings() {
     return "";
   }
 
+  const selectedGeminiModel = geminiModels.find((model) => model.id === configs.gemini.modelPrimary);
+
   return (
     <section className="settings-section" id="settings" aria-labelledby="settings-title">
       <div className="section-heading settings-heading">
@@ -281,15 +283,16 @@ export default function Settings() {
                       <small>{provider.helper}</small>
                     </label>
                     {provider.id === "gemini" && (
-                      <div className="integration-subgrid">
-                        <label className="integration-field">
+                      <div className="integration-subgrid integration-subgrid-gemini">
+                        <label className="integration-field gemini-model-field">
                           <span>최우선 모델</span>
                           <select
+                            className="gemini-model-select"
                             value={config.modelPrimary ?? ""}
                             onChange={(event) => patchConfig("gemini", { modelPrimary: event.target.value })}
                           >
                             {config.modelPrimary && !geminiModels.some((model) => model.id === config.modelPrimary) && (
-                              <option value={config.modelPrimary}>{config.modelPrimary} (현재 저장된 값)</option>
+                              <option value={config.modelPrimary}>{config.modelPrimary} · 현재 저장된 모델</option>
                             )}
                             {geminiModels.map((model) => (
                               <option
@@ -297,15 +300,22 @@ export default function Settings() {
                                 value={model.id}
                                 disabled={!model.isFreeTier && config.allowPaidGemini !== true}
                               >
-                                {model.displayName} ({model.id}) · {model.isFreeTier ? "무료 등급 지원" : "유료/요금제 확인 필요"}
+                                {model.displayName} · {model.isFreeTier ? "무료 지원" : "요금제 확인"}
                               </option>
                             ))}
                           </select>
-                          <small>선택한 모델을 먼저 사용합니다. 실패하면 이 API 키에서 사용할 수 있는 다른 무료 등급 지원 모델을 자동으로 시도합니다.</small>
-                          <small>무료 등급 지원도 계정의 무료 사용량을 초과하거나 유료 용량으로 전환하면 요금이 발생할 수 있습니다. Google AI Studio에서 사용량과 결제 상태를 확인하세요.</small>
-                          {geminiModelsError && <small>{geminiModelsError}</small>}
+                          <span className="gemini-model-meta" aria-live="polite">
+                            <span className="gemini-model-meta-label">선택한 모델 ID</span>
+                            <code>{selectedGeminiModel?.id ?? config.modelPrimary ?? "모델을 선택하세요"}</code>
+                            <span className={"gemini-model-tier " + (selectedGeminiModel?.isFreeTier ? "is-free" : "is-paid")}>
+                              {selectedGeminiModel ? (selectedGeminiModel.isFreeTier ? "무료 등급 지원" : "유료/요금제 확인 필요") : "목록에서 확인되지 않은 모델"}
+                            </span>
+                          </span>
+                          <small>선택한 모델을 먼저 사용합니다. 실패하면 이 API 키에서 사용할 수 있는 무료 등급 지원 모델을 자동으로 시도합니다.</small>
+                          <small>무료 등급 지원 모델도 계정의 무료 사용량을 초과하거나 유료 용량으로 전환하면 요금이 발생할 수 있습니다. Google AI Studio에서 사용량과 결제 상태를 확인하세요.</small>
+                          {geminiModelsError && <small className="gemini-model-error">{geminiModelsError}</small>}
                         </label>
-                        <label className="integration-checkbox">
+                        <label className="integration-checkbox gemini-auto-fallback">
                           <input
                             type="checkbox"
                             checked={config.allowPaidGemini === true}
@@ -313,7 +323,8 @@ export default function Settings() {
                           />
                           <span>유료 또는 요금제 미확인 모델도 자동 대체 후보에 포함</span>
                         </label>
-                        <label className="integration-field"><span>Google Cloud 프로젝트 슬롯 (선택)</span>
+                        <label className="integration-field gemini-project-slot">
+                          <span>Google Cloud 프로젝트 슬롯 <em>(선택)</em></span>
                           <input value={config.projectSlot ?? ""} onChange={(event) => patchConfig("gemini", { projectSlot: event.target.value })} placeholder="예: personal-project" />
                           <small>같은 프로젝트의 키를 여러 개 다른 쿼터로 계산하지 않도록 구분합니다.</small>
                         </label>

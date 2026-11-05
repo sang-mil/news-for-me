@@ -62,14 +62,32 @@ export async function getTopicForCollection(
 
 export async function createCollectionRun(
   db: D1Database,
-  topicId: string
+  topicId: string,
+  triggerSource: "manual" | "cron" = "manual"
 ): Promise<string> {
   const runId = crypto.randomUUID();
   await db.prepare(`
     INSERT INTO collection_runs (id, topic_id, trigger_source, status)
-    VALUES (?, ?, 'manual', 'queued')
-  `).bind(runId, topicId).run();
+    VALUES (?, ?, ?, 'queued')
+  `).bind(runId, topicId, triggerSource).run();
   return runId;
+}
+
+export interface DailyCollectionTarget {
+  topicId: string;
+  userId: string;
+}
+
+export async function listDailyCollectionTargets(
+  db: D1Database
+): Promise<DailyCollectionTarget[]> {
+  const result = await db.prepare(`
+    SELECT id AS topic_id, user_id
+    FROM topics
+    WHERE is_active = 1
+    ORDER BY created_at ASC
+  `).all<{ topic_id: string; user_id: string }>();
+  return result.results.map((row) => ({ topicId: row.topic_id, userId: row.user_id }));
 }
 
 export async function getCollectionRun(
@@ -91,6 +109,7 @@ export async function getCollectionRun(
 export async function listTopicArticles(
   db: D1Database,
   topicId: string,
+  userId: string,
   limit = 20
 ): Promise<NewsArticle[]> {
   const result = await db.prepare(`
@@ -99,12 +118,25 @@ export async function listTopicArticles(
       a.content_type, a.author, a.body_content, a.image_url, a.language,
       a.engagement_json
     FROM articles a
-    INNER JOIN topic_articles ta ON ta.article_id = a.id
-    INNER JOIN topics t ON t.id = ta.topic_id
-    WHERE ta.topic_id = ?
+    INNER JOIN user_topic_articles uta ON uta.article_id = a.id
+    INNER JOIN topics t ON t.id = uta.topic_id
+    WHERE uta.topic_id = ?
+      AND uta.user_id = ?
+      AND uta.linked_at > COALESCE((
+        SELECT cleared_at FROM user_topic_feed_state
+        WHERE user_id = ? AND topic_id = ?
+      ), '1970-01-01T00:00:00.000Z')
+      AND NOT EXISTS (
+        SELECT 1 FROM article_user_events e
+        WHERE e.user_id = ? AND e.article_id = a.id AND e.event_type = 'opened'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM article_saves saved
+        WHERE saved.user_id = ? AND saved.article_id = a.id
+      )
     ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
     LIMIT ?
-  `).bind(topicId, limit).all<ArticleRow>();
+  `).bind(topicId, userId, userId, topicId, userId, userId, limit).all<ArticleRow>();
 
   return result.results.map((row) => ({
     id: row.id,
@@ -179,6 +211,12 @@ export async function storeCollectedArticles(
       INSERT OR IGNORE INTO topic_articles (topic_id, article_id, match_reason)
       VALUES (?, ?, 'News RSS keyword search')
     `).bind(job.topicId, articleId));
+
+    statements.push(db.prepare(`
+      INSERT OR IGNORE INTO user_topic_articles (
+        user_id, topic_id, article_id, match_reason
+      ) VALUES (?, ?, ?, 'Personalized News RSS keyword search')
+    `).bind(job.userId, job.topicId, articleId));
   }
 
   statements.push(db.prepare(`

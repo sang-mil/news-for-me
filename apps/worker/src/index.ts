@@ -9,9 +9,11 @@ import { createAuth, isBetterAuthConfigured } from "./services/auth/better-auth"
 import { resolveAppIdentity } from "./lib/authentication";
 import { handleAuthMigration } from "./routes/auth-migration";
 import { handleIntegrationsRequest } from "./routes/integrations";
+import { handlePersonalizationRequest } from "./routes/personalization";
 import { cleanupUnScrapedNews } from "./services/maintenance/article-cleanup";
 import { jsonResponse } from "./lib/http";
 import { handleNewsCollectionQueue } from "./queues/consumers/news-collection";
+import { createCollectionRun, listDailyCollectionTargets } from "./db/repositories/news";
 import type { AIEnvironment } from "./services/ai/types";
 import type { CollectionJobMessage } from "./services/news/types";
 
@@ -127,6 +129,10 @@ export default {
       }
     }
 
+    const isPersonalizationApi =
+      url.pathname === "/api/interest-profile" ||
+      url.pathname.startsWith("/api/interest-profile/") ||
+      url.pathname.startsWith("/api/articles/");
     const isIntegrationsApi = url.pathname === "/api/integrations" || url.pathname.startsWith("/api/integrations/");
 
     const isNewsletterApi =
@@ -146,7 +152,7 @@ export default {
       url.pathname === "/api/topics" ||
       url.pathname.startsWith("/api/topics/");
 
-    if (isIntegrationsApi || isNewsletterApi || isScrapsApi || isTopicsApi) {
+    if (isPersonalizationApi || isIntegrationsApi || isNewsletterApi || isScrapsApi || isTopicsApi) {
       let identity;
       try {
         identity = await resolveAppIdentity(request, env);
@@ -161,6 +167,15 @@ export default {
           401,
           allowedOrigin
         );
+      }
+
+      if (isPersonalizationApi) {
+        try {
+          return await handlePersonalizationRequest(request, env, identity.userId, allowedOrigin);
+        } catch (error) {
+          console.error("Personalization API error:", error);
+          return jsonResponse({ error: "개인화 데이터를 처리하지 못했습니다." }, 500, allowedOrigin);
+        }
       }
 
       if (isIntegrationsApi) {
@@ -197,7 +212,7 @@ export default {
       }
 
       try {
-        if (/^\/api\/topics\/[^/]+\/(collect|articles|collection-runs\/[^/]+)$/.test(url.pathname)) {
+        if (/^\/api\/topics\/[^/]+\/(collect|articles(?:\/clear)?|collection-runs\/[^/]+)$/.test(url.pathname)) {
           return await handleCollectionRequest(
             request,
             env.DB,
@@ -227,6 +242,39 @@ export default {
       if (result.examined || result.staleFailed) {
         console.log("Newsletter schedule check completed", result);
       }
+      return;
+    }
+
+    if (controller.cron === "0 23 * * *") {
+      const targets = await listDailyCollectionTargets(env.DB);
+      let queued = 0;
+      let failed = 0;
+      for (const target of targets) {
+        const runId = await createCollectionRun(env.DB, target.topicId, "cron");
+        try {
+          await env.NEWS_QUEUE.send({
+            runId,
+            topicId: target.topicId,
+            userId: target.userId,
+            maxArticles: 10
+          });
+          queued += 1;
+        } catch (error) {
+          failed += 1;
+          const detail = error instanceof Error ? error.message : "Queue unavailable";
+          await env.DB.prepare(`
+            UPDATE collection_runs
+            SET status = 'failed', error_message = ?,
+              finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            WHERE id = ?
+          `).bind(detail.slice(0, 1000), runId).run();
+          console.error("Daily topic collection could not be queued", {
+            topicId: target.topicId,
+            error: detail
+          });
+        }
+      }
+      console.log("Daily topic collection scheduled", { total: targets.length, queued, failed });
       return;
     }
 

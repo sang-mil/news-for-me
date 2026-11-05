@@ -1,5 +1,6 @@
 ﻿import type { SavedNewsArticle, SavedNewsTag } from "@news-for-me/shared";
 import { jsonResponse } from "../lib/http";
+import { recordArticleEvent } from "../db/repositories/personalization";
 import {
   createUserTag,
   deleteUserTag,
@@ -164,6 +165,7 @@ export async function handleScrapsRequest(
     if (!saved) {
       return jsonResponse({ error: "Article not found in one of your topics." }, 404, allowedOrigin);
     }
+    await recordArticleEvent(db, userId, articleId, topicId, "saved");
     return jsonResponse({ data: saved }, 201, allowedOrigin);
   }
 
@@ -173,6 +175,7 @@ export async function handleScrapsRequest(
     try { articleId = decodeURIComponent(removeMatch[1]); }
     catch { return jsonResponse({ error: "Invalid article ID." }, 400, allowedOrigin); }
     await removeSavedArticle(db, userId, articleId);
+    await recordArticleEvent(db, userId, articleId, null, "unsaved");
     return jsonResponse({ ok: true }, 200, allowedOrigin);
   }
 

@@ -6,6 +6,7 @@ import {
   listTopicArticles
 } from "../db/repositories/news";
 import { jsonResponse } from "../lib/http";
+import { clearTopicFeed } from "../db/repositories/personalization";
 
 interface CollectionEnv {
   NEWS_QUEUE: Queue<CollectionJobMessage>;
@@ -21,8 +22,9 @@ export async function handleCollectionRequest(
   const url = new URL(request.url);
   const collectMatch = url.pathname.match(/^\/api\/topics\/([^/]+)\/collect$/);
   const articlesMatch = url.pathname.match(/^\/api\/topics\/([^/]+)\/articles$/);
+  const clearMatch = url.pathname.match(/^\/api\/topics\/([^/]+)\/articles\/clear$/);
   const runMatch = url.pathname.match(/^\/api\/topics\/([^/]+)\/collection-runs\/([^/]+)$/);
-  const topicIdRaw = collectMatch?.[1] ?? articlesMatch?.[1] ?? runMatch?.[1];
+  const topicIdRaw = collectMatch?.[1] ?? articlesMatch?.[1] ?? clearMatch?.[1] ?? runMatch?.[1];
 
   if (!topicIdRaw) return jsonResponse({ error: "Not Found" }, 404, allowedOrigin);
 
@@ -71,12 +73,17 @@ export async function handleCollectionRequest(
     return jsonResponse({ data: { runId, status: "queued" } }, 202, allowedOrigin);
   }
 
+  if (clearMatch && request.method === "POST") {
+    await clearTopicFeed(db, userId, topicId);
+    return jsonResponse({ ok: true }, 200, allowedOrigin);
+  }
+
   if (articlesMatch && request.method === "GET") {
     const requestedLimit = Number(url.searchParams.get("limit") ?? "20");
     const limit = Number.isFinite(requestedLimit)
       ? Math.min(50, Math.max(1, Math.floor(requestedLimit)))
       : 20;
-    const articles = await listTopicArticles(db, topicId, limit);
+    const articles = await listTopicArticles(db, topicId, userId, limit);
     return jsonResponse({ data: articles }, 200, allowedOrigin);
   }
 
