@@ -51,3 +51,19 @@ test("YouTube retention cleanup removes dependent data before article rows", asy
     articlesDeleted: 5
   });
 });
+
+
+import { selectSummarizableArticles } from "../../apps/worker/src/services/ai/summarizer.ts";
+
+test("YouTube API results are excluded from AI summarization", () => {
+  const video = {
+    articleId: "video-1",
+    item: { provider: "youtube-data-api", title: "Video title" }
+  };
+  const news = {
+    articleId: "news-1",
+    item: { provider: "google-news-rss", title: "News title" }
+  };
+
+  assert.deepEqual(selectSummarizableArticles([video, news, video]), [news]);
+});
