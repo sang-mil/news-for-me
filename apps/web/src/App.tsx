@@ -635,7 +635,7 @@ export default function App() {
                         <div className="collection-status" aria-live="polite">
                           <div>최근 수집 작업: {run.status} · {run.articlesFound}건</div>
                           {run.errorMessage && (
-                            <div className="collection-error" role="status">
+                            <div className={run.status === "completed" ? "collection-diagnostic" : "collection-error"} role="status">
                               수집 진단: {run.errorMessage}
                             </div>
                           )}

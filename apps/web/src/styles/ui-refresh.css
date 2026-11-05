@@ -634,6 +634,17 @@ select:focus-visible {
   color: #9d5147;
 }
 
+.collection-diagnostic {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #e5eee7;
+  color: #60756a;
+  font-size: 10px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .article-list {
   gap: 0;
   margin-top: 18px;

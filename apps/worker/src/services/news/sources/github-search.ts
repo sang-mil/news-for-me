@@ -1,4 +1,4 @@
-import type { CollectedNewsItem, NewsSearchInput } from "../types";
+import type { CollectedNewsItem, NewsSearchInput, NewsSourceSearchResult } from "../types";
 import { matchesTopicRelevance } from "../relevance";
 
 interface GitHubRepository {
@@ -23,12 +23,12 @@ function splitTerms(value: string): string[] {
 export async function searchGitHubRepositories(
   input: NewsSearchInput,
   maxResults = input.maxResults ?? 10
-): Promise<CollectedNewsItem[]> {
+): Promise<NewsSourceSearchResult> {
   const terms = [...new Set([
     ...splitTerms(input.topicName),
     ...input.includeKeywords.flatMap(splitTerms)
   ])].filter((term) => term.length >= 2).slice(0, 6);
-  if (terms.length === 0) return [];
+  if (terms.length === 0) return { items: [], diagnostics: { fetchedCount: 0, acceptedCount: 0, rejected: { emptyQuery: 1 } } };
 
   const query = `${terms.map((term) => `"${term}"`).join(" OR ")} in:name,description`;
   const url = new URL("https://api.github.com/search/repositories");
@@ -53,20 +53,39 @@ export async function searchGitHubRepositories(
   const payload = await response.json() as GitHubSearchResponse;
   const excluded = input.excludeKeywords.map((term) => term.toLocaleLowerCase()).filter(Boolean);
   const results: CollectedNewsItem[] = [];
+  const rejected: Record<string, number> = {
+    missingRepository: 0, invalidUrl: 0, topicMismatch: 0, excludedKeyword: 0
+  };
+  const repositories = payload.items ?? [];
 
-  for (const repository of payload.items ?? []) {
+  for (const repository of repositories) {
     const fullName = repository.full_name?.trim();
     const articleUrl = repository.html_url?.trim();
-    if (!fullName || !articleUrl) continue;
+    if (!fullName || !articleUrl) {
+      rejected.missingRepository += 1;
+      continue;
+    }
 
     let parsedUrl: URL;
-    try { parsedUrl = new URL(articleUrl); } catch { continue; }
-    if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== "github.com") continue;
+    try { parsedUrl = new URL(articleUrl); } catch {
+      rejected.invalidUrl += 1;
+      continue;
+    }
+    if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== "github.com") {
+      rejected.invalidUrl += 1;
+      continue;
+    }
 
     const description = repository.description?.trim() ?? "";
     const searchable = `${fullName} ${description} ${repository.language ?? ""}`.toLocaleLowerCase();
-    if (!matchesTopicRelevance(input, searchable)) continue;
-    if (excluded.some((keyword) => searchable.includes(keyword))) continue;
+    if (!matchesTopicRelevance(input, searchable)) {
+      rejected.topicMismatch += 1;
+      continue;
+    }
+    if (excluded.some((keyword) => searchable.includes(keyword))) {
+      rejected.excludedKeyword += 1;
+      continue;
+    }
 
     const timestamp = repository.updated_at ? Date.parse(repository.updated_at) : Number.NaN;
     const stars = typeof repository.stargazers_count === "number" && Number.isFinite(repository.stargazers_count)
@@ -92,8 +111,16 @@ export async function searchGitHubRepositories(
     if (results.length >= maxResults) break;
   }
 
+  const rejectedCounts = Object.fromEntries(Object.entries(rejected).filter(([, count]) => count > 0));
   console.info("[NewsForMe][RSS] GitHub search completed", {
-    query, returned: payload.items?.length ?? 0, accepted: results.length
+    query, returned: repositories.length, accepted: results.length, rejected: rejectedCounts
   });
-  return results;
+  return {
+    items: results,
+    diagnostics: {
+      fetchedCount: repositories.length,
+      acceptedCount: results.length,
+      rejected: rejectedCounts
+    }
+  };
 }

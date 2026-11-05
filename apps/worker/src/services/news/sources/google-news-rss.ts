@@ -1,6 +1,8 @@
 import { XMLParser } from "fast-xml-parser";
-import type { CollectedNewsItem, NewsSearchInput, NewsSource } from "../types";
-import { matchesTopicRelevance } from "../relevance";
+import type {
+  CollectedNewsItem, NewsSearchInput, NewsSource, NewsSourceSearchResult
+} from "../types";
+import { matchesTopicRelevance } from "../relevance.ts";
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -40,6 +42,10 @@ function safeQueryTerm(value: string): string {
   return value.replace(/["\\]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 export function buildGoogleNewsQuery(
   topicName: string,
   includeKeywords: string[],
@@ -63,45 +69,65 @@ export function buildGoogleNewsQuery(
   return [positiveQuery, ...negatives, "when:7d"].join(" ");
 }
 
+async function fetchGoogleNewsRss(url: string): Promise<Response> {
+  const retryableStatuses = new Set([429, 500, 502, 503, 504]);
+  let lastError = "Unknown fetch error";
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    let response: Response | null = null;
+    try {
+      response = await fetch(url, {
+        headers: {
+          Accept: "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+          "User-Agent": "NewsForMe/0.2 (+https://news-for-me.pages.dev)"
+        },
+        signal: AbortSignal.timeout(12_000)
+      });
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : "Unknown fetch error";
+    }
+
+    if (response?.ok) return response;
+    const shouldRetry = !response || retryableStatuses.has(response.status);
+    if (!shouldRetry || attempt === 3) {
+      if (!response) {
+        throw new Error(`Google News RSS request failed after ${attempt} attempt(s): ${lastError.slice(0, 240)}`);
+      }
+      const contentType = response.headers.get("content-type") ?? "unknown";
+      const retryAfter = response.headers.get("retry-after") ?? "not provided";
+      let bodyPreview = "";
+      try {
+        bodyPreview = (await response.text()).replace(/\s+/g, " ").trim().slice(0, 240);
+      } catch {
+        bodyPreview = "response body could not be read";
+      }
+      throw new Error(
+        `Google News RSS returned HTTP ${response.status} after ${attempt} attempt(s); content-type=${contentType}; retry-after=${retryAfter}; body=${bodyPreview || "empty"}`
+      );
+    }
+
+    const retryAfterSeconds = response?.headers.get("retry-after");
+    const retryAfterMs = retryAfterSeconds && /^\d+$/.test(retryAfterSeconds)
+      ? Math.min(1500, Number(retryAfterSeconds) * 1000)
+      : 0;
+    await wait(Math.max(retryAfterMs, 350 * attempt));
+  }
+
+  throw new Error(`Google News RSS request failed: ${lastError.slice(0, 240)}`);
+}
+
 export async function searchGoogleNewsRss(
   query: string,
   input: NewsSearchInput,
   maxResults = 10
-): Promise<CollectedNewsItem[]> {
+): Promise<NewsSourceSearchResult> {
   const url = new URL("https://news.google.com/rss/search");
   url.searchParams.set("q", query);
   url.searchParams.set("hl", "ko");
   url.searchParams.set("gl", "KR");
   url.searchParams.set("ceid", "KR:ko");
 
-  let response: Response;
-  try {
-    response = await fetch(url.toString(), {
-      headers: {
-        Accept: "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
-        "User-Agent": "NewsForMe/0.1 RSS reader"
-      },
-      signal: AbortSignal.timeout(12_000)
-    });
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : "Unknown fetch error";
-    throw new Error(`Google News RSS request failed before receiving a response: ${detail.slice(0, 300)}`);
-  }
-
-  if (!response.ok) {
-    const contentType = response.headers.get("content-type") ?? "unknown";
-    const retryAfter = response.headers.get("retry-after") ?? "not provided";
-    let bodyPreview = "";
-    try {
-      bodyPreview = (await response.text()).replace(/\s+/g, " ").trim().slice(0, 300);
-    } catch {
-      bodyPreview = "response body could not be read";
-    }
-    throw new Error(
-      `Google News RSS returned HTTP ${response.status}; content-type=${contentType}; retry-after=${retryAfter}; body=${bodyPreview || "empty"}`
-    );
-  }
-
+  const response = await fetchGoogleNewsRss(url.toString());
   const xml = await response.text();
   if (xml.length > 2_000_000) {
     throw new Error("News RSS response exceeded the 2 MB safety limit.");
@@ -111,16 +137,23 @@ export async function searchGoogleNewsRss(
     rss?: { channel?: { item?: unknown | unknown[] } };
   };
   const rawItems = parsed.rss?.channel?.item;
-  if (!rawItems) return [];
-
-  const items = Array.isArray(rawItems) ? rawItems : [rawItems];
-  const excluded = input.excludeKeywords
-    .map((keyword) => keyword.toLocaleLowerCase())
-    .filter(Boolean);
+  const items = rawItems ? (Array.isArray(rawItems) ? rawItems : [rawItems]) : [];
+  const rejected: Record<string, number> = {
+    invalidItem: 0,
+    missingTitle: 0,
+    missingLink: 0,
+    invalidUrl: 0,
+    topicMismatch: 0,
+    excludedKeyword: 0
+  };
+  const excluded = input.excludeKeywords.map((keyword) => keyword.toLocaleLowerCase()).filter(Boolean);
   const collected: CollectedNewsItem[] = [];
 
   for (const raw of items) {
-    if (!raw || typeof raw !== "object") continue;
+    if (!raw || typeof raw !== "object") {
+      rejected.invalidItem += 1;
+      continue;
+    }
     const item = raw as Record<string, unknown>;
     const title = asText(item.title);
     const rawLink = asText(item.link);
@@ -128,19 +161,36 @@ export async function searchGoogleNewsRss(
     const pubDate = asText(item.pubDate);
     const excerpt = cleanExcerpt(asText(item.description));
 
-    if (!title || !rawLink) continue;
+    if (!title) {
+      rejected.missingTitle += 1;
+      continue;
+    }
+    if (!rawLink) {
+      rejected.missingLink += 1;
+      continue;
+    }
 
     let parsedLink: URL;
     try {
       parsedLink = new URL(rawLink);
     } catch {
+      rejected.invalidUrl += 1;
       continue;
     }
-    if (parsedLink.protocol !== "https:") continue;
+    if (parsedLink.protocol !== "https:" || parsedLink.username || parsedLink.password) {
+      rejected.invalidUrl += 1;
+      continue;
+    }
 
     const searchable = `${title} ${sourceName ?? ""} ${excerpt ?? ""}`.toLocaleLowerCase();
-    if (!matchesTopicRelevance(input, searchable)) continue;
-    if (excluded.some((keyword) => searchable.includes(keyword))) continue;
+    if (!matchesTopicRelevance(input, searchable)) {
+      rejected.topicMismatch += 1;
+      continue;
+    }
+    if (excluded.some((keyword) => searchable.includes(keyword))) {
+      rejected.excludedKeyword += 1;
+      continue;
+    }
 
     const timestamp = pubDate ? Date.parse(pubDate) : Number.NaN;
     collected.push({
@@ -155,13 +205,23 @@ export async function searchGoogleNewsRss(
     if (collected.length >= maxResults) break;
   }
 
-  return collected;
+  const rejectedCounts = Object.fromEntries(
+    Object.entries(rejected).filter(([, count]) => count > 0)
+  );
+  return {
+    items: collected,
+    diagnostics: {
+      fetchedCount: items.length,
+      acceptedCount: collected.length,
+      rejected: rejectedCounts
+    }
+  };
 }
 
 export const googleNewsRssSource: NewsSource = {
   id: "google-news-rss",
   contentType: "article",
-  async search(input: NewsSearchInput): Promise<CollectedNewsItem[]> {
+  async search(input: NewsSearchInput): Promise<NewsSourceSearchResult> {
     const query = buildGoogleNewsQuery(
       input.topicName,
       input.includeKeywords,

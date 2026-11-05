@@ -1,4 +1,4 @@
-import type { CollectedNewsItem, NewsSearchInput, NewsSource } from "../types";
+import type { CollectedNewsItem, NewsSearchInput, NewsSource, NewsSourceSearchResult } from "../types";
 import { matchesTopicRelevance } from "../relevance";
 
 interface YouTubeSearchItem {
@@ -39,9 +39,9 @@ export function createYouTubeVideosSource(apiKey: string): NewsSource {
   return {
     id: "youtube-data-api",
     contentType: "video",
-    async search(input: NewsSearchInput): Promise<CollectedNewsItem[]> {
+    async search(input: NewsSearchInput): Promise<NewsSourceSearchResult> {
       const query = buildYouTubeSearchQuery(input);
-      if (!query) return [];
+      if (!query) return { items: [], diagnostics: { fetchedCount: 0, acceptedCount: 0, rejected: { emptyQuery: 1 } } };
       const url = new URL("https://www.googleapis.com/youtube/v3/search");
       url.searchParams.set("part", "snippet");
       url.searchParams.set("type", "video");
@@ -64,16 +64,32 @@ export function createYouTubeVideosSource(apiKey: string): NewsSource {
       const payload = await response.json() as YouTubeSearchResponse;
       const excluded = input.excludeKeywords.map((term) => term.toLocaleLowerCase()).filter(Boolean);
       const results: CollectedNewsItem[] = [];
+      const rejected: Record<string, number> = {
+        invalidVideo: 0, missingTitle: 0, topicMismatch: 0, excludedKeyword: 0
+      };
       for (const video of payload.items ?? []) {
         const videoId = video.id?.videoId?.trim();
         const snippet = video.snippet;
         const title = snippet?.title?.trim() ?? "";
-        if (video.id?.kind !== "youtube#video" || !videoId || !title) continue;
+        if (video.id?.kind !== "youtube#video" || !videoId) {
+          rejected.invalidVideo += 1;
+          continue;
+        }
+        if (!title) {
+          rejected.missingTitle += 1;
+          continue;
+        }
         const description = snippet?.description?.trim() ?? "";
         const channelTitle = snippet?.channelTitle?.trim() ?? "YouTube";
         const searchable = (title + " " + description + " " + channelTitle).toLocaleLowerCase();
-        if (!matchesTopicRelevance(input, searchable)) continue;
-        if (excluded.some((term) => searchable.includes(term))) continue;
+        if (!matchesTopicRelevance(input, searchable)) {
+          rejected.topicMismatch += 1;
+          continue;
+        }
+        if (excluded.some((term) => searchable.includes(term))) {
+          rejected.excludedKeyword += 1;
+          continue;
+        }
         const timestamp = snippet?.publishedAt ? Date.parse(snippet.publishedAt) : Number.NaN;
         results.push({
           title: title.slice(0, 500),
@@ -90,8 +106,21 @@ export function createYouTubeVideosSource(apiKey: string): NewsSource {
         });
         if (results.length >= (input.maxResults ?? 10)) break;
       }
-      console.info("[NewsForMe][YouTube] search completed", { returned: payload.items?.length ?? 0, accepted: results.length, queryTerms: query });
-      return results;
+      const rejectedCounts = Object.fromEntries(Object.entries(rejected).filter(([, count]) => count > 0));
+      console.info("[NewsForMe][YouTube] search completed", {
+        returned: payload.items?.length ?? 0,
+        accepted: results.length,
+        rejected: rejectedCounts,
+        queryTerms: query
+      });
+      return {
+        items: results,
+        diagnostics: {
+          fetchedCount: payload.items?.length ?? 0,
+          acceptedCount: results.length,
+          rejected: rejectedCounts
+        }
+      };
     }
   };
 }

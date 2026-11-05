@@ -5,6 +5,8 @@ import {
 import { collectFromSources } from "../../services/news/collection-engine";
 import { googleNewsRssSource } from "../../services/news/sources/google-news-rss";
 import { searchBingNewsRss } from "../../services/news/sources/bing-news-rss";
+import { gdeltNewsSource } from "../../services/news/sources/gdelt-news";
+import { createNaverNewsSource } from "../../services/news/sources/naver-news";
 import { searchGitHubRepositories } from "../../services/news/sources/github-search";
 import { searchV2exTopics } from "../../services/news/sources/v2ex";
 import { createYouTubeVideosSource } from "../../services/news/sources/youtube";
@@ -18,7 +20,7 @@ import type { AIEnvironment } from "../../services/ai/types";
 import type { CollectionJobMessage, NewsSource } from "../../services/news/types";
 import { getUserIntegration, type IntegrationProvider } from "../../services/integrations";
 
-interface CollectionConsumerEnv extends AIEnvironment { DB: D1Database; INTEGRATION_ENCRYPTION_KEY?: string; YOUTUBE_API_KEY?: string; X_BEARER_TOKEN?: string; THREADS_ACCESS_TOKEN?: string; }
+interface CollectionConsumerEnv extends AIEnvironment { DB: D1Database; INTEGRATION_ENCRYPTION_KEY?: string; YOUTUBE_API_KEY?: string; X_BEARER_TOKEN?: string; THREADS_ACCESS_TOKEN?: string; NAVER_CLIENT_ID?: string; NAVER_CLIENT_SECRET?: string; }
 
 function parseKeywords(value: string): string[] {
   try {
@@ -113,10 +115,22 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
   const threadsAccessToken = useSavedSecret(threadsIntegration, env.THREADS_ACCESS_TOKEN);
   const sources: NewsSource[] = [
     googleNewsRssSource,
-    { id: "bing-news-rss", contentType: "article", search: async (input) => (await searchBingNewsRss(input)).items }
+    { id: "bing-news-rss", contentType: "article", search: async (input) => {
+      const result = await searchBingNewsRss(input);
+      return { items: result.items, diagnostics: result.sourceDiagnostics };
+    } },
+    gdeltNewsSource
   ];
   const skippedSources: string[] = [];
   const softwareTopic = isSoftwareOrTechTopic(searchInput);
+  const naverClientId = env.NAVER_CLIENT_ID?.trim();
+  const naverClientSecret = env.NAVER_CLIENT_SECRET?.trim();
+
+  if (naverClientId && naverClientSecret) {
+    sources.push(createNaverNewsSource(naverClientId, naverClientSecret));
+  } else {
+    skippedSources.push("naver-news-api (missing NAVER_CLIENT_ID/NAVER_CLIENT_SECRET)");
+  }
 
   if (softwareTopic) {
     sources.push(
@@ -146,14 +160,42 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
     skippedSources.push("threads-api (missing THREADS_ACCESS_TOKEN)");
   }
   const collection = await collectFromSources(sources, searchInput, maxArticles);
-  const sourceSummary = Object.entries(collection.sourceCounts).map(([id, count]) => id + "=" + count).join(", ");
-  const failureSummary = collection.failures.map((failure) => failure.sourceId + ": " + failure.message).join(" | ");
+  const sourceSummary = Object.entries(collection.sourceCounts)
+    .map(([id, count]) => id + "=" + count)
+    .join(", ");
+  const failureSummary = collection.failures
+    .map((failure) => failure.sourceId + ": " + failure.message)
+    .join(" | ");
+  const diagnosticSummary = Object.entries(collection.sourceDiagnostics)
+    .flatMap(([id, diagnostic]) => {
+      if (!diagnostic) return [];
+      const rejected = Object.entries(diagnostic.rejected)
+        .map(([reason, count]) => reason + ":" + count)
+        .join(",");
+      const observations = Object.entries(diagnostic.observations ?? {})
+        .map(([reason, count]) => reason + ":" + count)
+        .join(",");
+      return [id + "[fetched:" + diagnostic.fetchedCount
+        + ",accepted:" + diagnostic.acceptedCount
+        + (rejected ? ",rejected:" + rejected : "")
+        + (observations ? ",observed:" + observations : "") + "]"];
+    })
+    .join(" ");
+  const shortfall = Math.max(0, maxArticles - collection.items.length);
+  const mergeSummary = collection.mergeDiagnostics.duplicateCount > 0
+    || collection.mergeDiagnostics.invalidUrlCount > 0
+    ? " Merge duplicates=" + collection.mergeDiagnostics.duplicateCount
+      + ", invalid URLs=" + collection.mergeDiagnostics.invalidUrlCount + "."
+    : "";
   const collectionNote = [
-    "Requested up to " + maxArticles + " items.",
+    "Requested " + maxArticles + "; collected " + collection.items.length + "/" + maxArticles
+      + (shortfall > 0 ? "; shortfall=" + shortfall : "; target reached") + ".",
     "Source counts: " + (sourceSummary || "none") + ".",
+    diagnosticSummary ? "Rejection diagnostics: " + diagnosticSummary + "." : null,
+    mergeSummary.trim() || null,
     failureSummary ? "Partial source failures: " + failureSummary : null,
     skippedSources.length ? "Skipped sources: " + skippedSources.join(", ") : null
-  ].filter(Boolean).join(" ");
+  ].filter(Boolean).join(" ").slice(0, 950);
 
   const storedArticles = await storeCollectedArticles(env.DB, job, collection.items, collectionNote);
   const result = await summarizeCollectedArticles(env.DB, job.runId, job.topicId, storedArticles, aiEnvironment);
