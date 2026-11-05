@@ -15,3 +15,7 @@ WHERE provider = 'youtube-data-api';
 
 CREATE INDEX idx_articles_provider_data_retention
   ON articles(provider, provider_data_refreshed_at);
+
+-- Remove previously generated AI summaries based on YouTube API data.
+DELETE FROM summaries
+WHERE article_id IN (SELECT id FROM articles WHERE provider = 'youtube-data-api');
