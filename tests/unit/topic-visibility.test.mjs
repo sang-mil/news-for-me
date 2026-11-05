@@ -34,7 +34,7 @@ test("topic listing returns only owned or explicitly public topics", async () =>
   const countQuery = calls.find((call) => call.sql.includes("COUNT(*) AS count FROM topics WHERE"));
 
   assert.ok(listQuery);
-  assert.match(listQuery.sql, /WHERE t\.user_id=\? OR t\.is_public=1/);
+  assert.match(listQuery.sql, /WHERE t\.user_id\s*=\s*\? OR t\.is_public\s*=\s*1/);
   assert.deepEqual(listQuery.values, ["viewer-1", "viewer-1", 5, 5]);
   assert.ok(countQuery);
   assert.match(countQuery.sql, /WHERE user_id=\? OR is_public=1/);
@@ -48,7 +48,7 @@ test("individual topic lookup excludes another user's private topics", async () 
   const query = calls[0];
 
   assert.equal(topic, null);
-  assert.match(query.sql, /WHERE t\.id=\? AND \(t\.user_id=\? OR t\.is_public=1\)/);
+  assert.match(query.sql, /WHERE t\.id\s*=\s*\? AND \(t\.user_id\s*=\s*\? OR t\.is_public\s*=\s*1\)/);
   assert.deepEqual(query.values, ["viewer-1", "topic-private", "viewer-1"]);
 });
 
