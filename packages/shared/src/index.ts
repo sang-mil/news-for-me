@@ -10,6 +10,7 @@ export interface Topic {
   name: string;
   createdByName: string;
   isOwner: boolean;
+  isPublic: boolean;
   description: string | null;
   includeKeywords: string[];
   excludeKeywords: string[];
@@ -21,6 +22,7 @@ export interface Topic {
 
 export interface TopicInput {
   name: string;
+  isPublic?: boolean;
   description?: string | null;
   includeKeywords?: string[];
   excludeKeywords?: string[];
