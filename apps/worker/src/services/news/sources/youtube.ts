@@ -1,5 +1,5 @@
 import type { CollectedNewsItem, NewsSearchInput, NewsSource, NewsSourceSearchResult } from "../types";
-import { matchesTopicRelevance } from "../relevance";
+import { matchesTopicRelevance } from "../relevance.ts";
 
 interface YouTubeSearchItem {
   id?: { kind?: string; videoId?: string };
