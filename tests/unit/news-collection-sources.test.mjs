@@ -105,10 +105,10 @@ test("GDELT widens its query and exposes relevance/exclusion counts", async () =
   try {
     const result = await searchGdeltNews(baseInput, 3);
     assert.equal(calls, 2);
-    assert.equal(result.items.length, 2);
+    assert.equal(result.items.length, 3);
     assert.equal(result.diagnostics.fetchedCount, 4);
     assert.equal(result.diagnostics.rejected.excludedKeyword, 1);
-    assert.equal(result.diagnostics.rejected.topicMismatch, 1);
+    assert.equal(result.diagnostics.observations.titleNotMatched, 1);
     assert.equal(result.items[0].publishedAt, "2026-11-05T01:02:03.000Z");
   } finally {
     globalThis.fetch = originalFetch;
