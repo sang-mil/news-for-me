@@ -49,15 +49,16 @@ function toCollectionRun(row: CollectionRunRow): CollectionRun {
 
 export async function getTopicForCollection(
   db: D1Database,
-  topicId: string
+  topicId: string,
+  userId: string
 ): Promise<TopicForCollection | null> {
   return db.prepare(`
     SELECT id, user_id, name, description,
       include_keywords_json, exclude_keywords_json
     FROM topics
-    WHERE id = ? AND is_active = 1
+    WHERE id = ? AND user_id = ? AND is_active = 1
     LIMIT 1
-  `).bind(topicId).first<TopicForCollection>();
+  `).bind(topicId, userId).first<TopicForCollection>();
 }
 
 export async function createCollectionRun(
@@ -93,16 +94,17 @@ export async function listDailyCollectionTargets(
 export async function getCollectionRun(
   db: D1Database,
   topicId: string,
-  runId: string
+  runId: string,
+  userId: string
 ): Promise<CollectionRun | null> {
   const row = await db.prepare(`
     SELECT cr.id, cr.topic_id, cr.status, cr.articles_found,
       cr.error_message, cr.started_at, cr.finished_at, cr.created_at
     FROM collection_runs cr
     INNER JOIN topics t ON t.id = cr.topic_id
-    WHERE cr.id = ? AND cr.topic_id = ?
+    WHERE cr.id = ? AND cr.topic_id = ? AND t.user_id = ?
     LIMIT 1
-  `).bind(runId, topicId).first<CollectionRunRow>();
+  `).bind(runId, topicId, userId).first<CollectionRunRow>();
   return row ? toCollectionRun(row) : null;
 }
 
