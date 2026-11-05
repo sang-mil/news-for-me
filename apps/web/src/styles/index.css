@@ -1162,7 +1162,32 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .integration-field input:focus { border-color: #8ba08a; box-shadow: 0 0 0 3px rgba(84,115,90,0.09); background: white; }
 .integration-field input::placeholder { color: #a6ac9f; }
 .integration-field small { color: #999f93; font-size: 9px; font-weight: 450; line-height: 1.6; }
+.integration-field select { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; }
 .integration-subgrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 10px; }
+
+/* Keep the long Gemini model catalogue inside a predictable, readable column. */
+.integration-subgrid-gemini { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.integration-subgrid-gemini > * { min-width: 0; }
+.integration-subgrid-gemini .integration-field { width: 100%; min-width: 0; }
+.gemini-model-select {
+  display: block; box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%;
+  min-height: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gemini-model-meta {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 9px;
+  min-width: 0; padding: 9px 11px; border: 1px solid #e7ebe3; border-radius: 10px;
+  background: #f7f8f2; line-height: 1.5;
+}
+.gemini-model-meta-label { color: #7e897b; font-size: 9px; font-weight: 600; }
+.gemini-model-meta code { min-width: 0; color: #344233; font-size: 10px; overflow-wrap: anywhere; }
+.gemini-model-tier { margin-left: auto; padding: 3px 7px; border-radius: 999px; font-size: 9px; font-weight: 700; }
+.gemini-model-tier.is-free { color: #43714a; background: #eaf4e8; }
+.gemini-model-tier.is-paid { color: #8a6337; background: #f7efe1; }
+.gemini-model-error { color: #a34c42 !important; }
+.gemini-auto-fallback { display: flex; width: fit-content; max-width: 100%; align-items: flex-start; padding: 10px 12px; border: 1px solid #e7ebe3; border-radius: 10px; background: #fafbf7; line-height: 1.6; }
+.gemini-auto-fallback span { min-width: 0; }
+.gemini-project-slot em { color: #99a294; font-size: 9px; font-style: normal; font-weight: 500; }
+
 .integration-subgrid > .integration-field:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .integration-checkbox { display: inline-flex; align-items: center; gap: 8px; margin-top: 13px; color: #697363; font-size: 10px; cursor: pointer; }
 .integration-checkbox input { width: 14px; height: 14px; accent-color: var(--forest); }
