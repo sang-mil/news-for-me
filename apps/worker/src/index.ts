@@ -10,7 +10,7 @@ import { resolveAppIdentity } from "./lib/authentication";
 import { handleAuthMigration } from "./routes/auth-migration";
 import { handleIntegrationsRequest } from "./routes/integrations";
 import { handlePersonalizationRequest } from "./routes/personalization";
-import { cleanupUnScrapedNews } from "./services/maintenance/article-cleanup";
+import { cleanupExpiredYouTubeData, cleanupUnScrapedNews } from "./services/maintenance/article-cleanup";
 import { jsonResponse } from "./lib/http";
 import { handleNewsCollectionQueue } from "./queues/consumers/news-collection";
 import { createCollectionRun, listDailyCollectionTargets } from "./db/repositories/news";
@@ -275,6 +275,12 @@ export default {
         }
       }
       console.log("Daily topic collection scheduled", { total: targets.length, queued, failed });
+      return;
+    }
+
+    if (controller.cron === "0 * * * *") {
+      const result = await cleanupExpiredYouTubeData(env.DB, new Date(controller.scheduledTime).toISOString());
+      if (result.articlesDeleted > 0) console.log("Expired YouTube API data cleanup completed", result);
       return;
     }
 
