@@ -13,6 +13,7 @@ interface TopicPayload {
   description?: unknown;
   includeKeywords?: unknown;
   excludeKeywords?: unknown;
+  isPublic?: unknown;
 }
 
 interface ValidationResult {
@@ -63,7 +64,7 @@ function validatePayload(payload: unknown, partial: boolean): ValidationResult {
 
   const body = payload as TopicPayload;
   const value: Partial<TopicInput> & { name?: string } = {};
-  const allowedKeys = new Set(["name", "description", "includeKeywords", "excludeKeywords"]);
+  const allowedKeys = new Set(["name", "description", "includeKeywords", "excludeKeywords", "isPublic"]);
 
   for (const key of Object.keys(body)) {
     if (!allowedKeys.has(key)) errors.push(`Unknown field: ${key}`);
@@ -94,6 +95,13 @@ function validatePayload(payload: unknown, partial: boolean): ValidationResult {
     }
   } else if (!partial) {
     value.description = null;
+  }
+
+  if (body.isPublic !== undefined) {
+    if (typeof body.isPublic !== "boolean") errors.push("isPublic must be a boolean.");
+    else value.isPublic = body.isPublic;
+  } else if (!partial) {
+    value.isPublic = false;
   }
 
   const includeKeywords = normalizeKeywords(body.includeKeywords, "includeKeywords", errors);
