@@ -196,16 +196,34 @@ export async function storeCollectedArticles(
       INSERT OR IGNORE INTO articles (
         id, canonical_url, url_hash, title, source_name,
         published_at, content_excerpt, language, metadata_json, provider,
-        content_type, author, body_content, image_url, engagement_json, external_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        content_type, author, body_content, image_url, engagement_json, external_id,
+        provider_data_refreshed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        CASE WHEN ? = 'youtube-data-api' THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now') ELSE NULL END)
     `).bind(
       articleId, normalizedUrl, urlHash, item.title, item.sourceName,
       item.publishedAt, item.excerpt, item.language ?? "ko",
       JSON.stringify({ provider: item.provider, ...(item.metadata ?? {}) }),
       item.provider, item.contentType ?? "article", item.author ?? null,
       item.bodyContent ?? null, item.imageUrl ?? null,
-      JSON.stringify(item.engagement ?? {}), item.externalId ?? null
+      JSON.stringify(item.engagement ?? {}), item.externalId ?? null,
+      item.provider
     ));
+
+    if (item.provider === "youtube-data-api") {
+      statements.push(db.prepare(`
+        UPDATE articles
+        SET title = ?, source_name = ?, published_at = ?, content_excerpt = ?,
+          author = ?, image_url = ?, language = ?, metadata_json = ?,
+          external_id = ?, provider_data_refreshed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        WHERE canonical_url = ? AND provider = 'youtube-data-api'
+      `).bind(
+        item.title, item.sourceName, item.publishedAt, item.excerpt,
+        item.author ?? null, item.imageUrl ?? null, item.language ?? "ko",
+        JSON.stringify({ provider: item.provider, ...(item.metadata ?? {}) }),
+        item.externalId ?? null, normalizedUrl
+      ));
+    }
 
     statements.push(db.prepare(`
       INSERT OR IGNORE INTO topic_articles (topic_id, article_id, match_reason)
