@@ -16,7 +16,7 @@ The collector requests up to the configured maximum from each eligible source, m
 
 ## YouTube Data API retention
 
-YouTube API search results are tracked with a provider-data refresh timestamp. A video returned by a later YouTube search refreshes that timestamp and its provider metadata. Video title/description metadata is excluded from AI summarization and interest-profile analysis. Existing YouTube-derived summaries, behavior events, and generated interest profiles are cleared by migration 0011; interest profiles can be rebuilt from non-YouTube signals. Rows that have not been refreshed for 29 days are removed, including dependent feed links and saved-item metadata. The hourly Worker cleanup uses a one-day safety margin against the 30-day YouTube API data retention limit.
+YouTube API search results are tracked with a provider-data refresh timestamp. A video returned by a later YouTube search refreshes that timestamp and its provider metadata. Video title/description metadata is excluded from AI summarization and interest-profile analysis. Migration 0011 also removes previously stored Naver Search API results and their dependent saved/feed records. Existing YouTube-derived summaries, behavior events, and generated interest profiles are cleared; interest profiles can be rebuilt from non-YouTube signals. Rows that have not been refreshed for 29 days are removed, including dependent feed links and saved-item metadata. The hourly Worker cleanup uses a one-day safety margin against the 30-day YouTube API data retention limit.
 
 Set `YOUTUBE_API_KEY` only when YouTube collection is intentionally enabled. The API source is skipped when the key is unavailable.
 
