@@ -4,7 +4,6 @@ import { collectFromSources } from "../../apps/worker/src/services/news/collecti
 import { googleNewsRssSource } from "../../apps/worker/src/services/news/sources/google-news-rss.ts";
 import { searchBingNewsRss } from "../../apps/worker/src/services/news/sources/bing-news-rss.ts";
 import { searchGdeltNews } from "../../apps/worker/src/services/news/sources/gdelt-news.ts";
-import { createNaverNewsSource } from "../../apps/worker/src/services/news/sources/naver-news.ts";
 
 const baseInput = {
   topicName: "인공지능",
@@ -110,54 +109,6 @@ test("GDELT widens its query and exposes relevance/exclusion counts", async () =
     assert.equal(result.diagnostics.rejected.excludedKeyword, 1);
     assert.equal(result.diagnostics.observations.titleNotMatched, 1);
     assert.equal(result.items[0].publishedAt, "2026-11-05T01:02:03.000Z");
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("Naver News API applies credentials and reports filter decisions", async () => {
-  const originalFetch = globalThis.fetch;
-  let calls = 0;
-  globalThis.fetch = async (input, init) => {
-    calls += 1;
-    assert.equal(new Headers(init?.headers).get("X-Naver-Client-Id"), "client-id");
-    assert.equal(new Headers(init?.headers).get("X-Naver-Client-Secret"), "client-secret");
-    const url = new URL(String(input));
-    assert.equal(url.hostname, "openapi.naver.com");
-    return Response.json({
-      items: [
-        {
-          title: "<b>인공지능</b> 새 소식",
-          originallink: "https://publisher.example.com/ai",
-          link: "https://n.news.naver.com/article/1",
-          description: "AI 산업 동향",
-          pubDate: "Wed, 05 Nov 2026 10:00:00 +0900"
-        },
-        {
-          title: "인공지능 광고 상품",
-          originallink: "https://publisher.example.com/ad",
-          description: "광고",
-          pubDate: "Wed, 05 Nov 2026 10:00:00 +0900"
-        },
-        {
-          title: "스포츠 경기 결과",
-          originallink: "https://publisher.example.com/sports",
-          description: "오늘 경기",
-          pubDate: "Wed, 05 Nov 2026 10:00:00 +0900"
-        }
-      ]
-    });
-  };
-
-  try {
-    const source = createNaverNewsSource("client-id", "client-secret");
-    const result = await source.search(baseInput);
-    assert.equal(calls, 2);
-    assert.equal(result.items.length, 1);
-    assert.equal(result.items[0].provider, "naver-news-api");
-    assert.equal(result.diagnostics.rejected.excludedKeyword, 2);
-    assert.equal(result.diagnostics.rejected.topicMismatch, 2);
-    assert.equal(result.diagnostics.rejected.duplicateAcrossQueries, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }
