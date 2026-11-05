@@ -59,3 +59,34 @@ export async function cleanupUnScrapedNews(
     articlesDeleted: results[2]?.meta.changes ?? 0
   };
 }
+
+export interface ExpiredYouTubeDataCleanupResult {
+  behaviorEventsDeleted: number;
+  savedItemsDeleted: number;
+  personalFeedLinksDeleted: number;
+  topicArticleLinksDeleted: number;
+  articlesDeleted: number;
+}
+
+/** Delete YouTube API data before its 30-day retention limit. */
+export async function cleanupExpiredYouTubeData(
+  db: D1Database,
+  now = new Date().toISOString()
+): Promise<ExpiredYouTubeDataCleanupResult> {
+  const expired = "provider = 'youtube-data-api' AND provider_data_refreshed_at IS NOT NULL " +
+    "AND julianday(provider_data_refreshed_at) <= julianday(?, '-29 days')";
+  const results = await db.batch([
+    db.prepare("DELETE FROM article_user_events WHERE article_id IN (SELECT id FROM articles WHERE " + expired + ")").bind(now),
+    db.prepare("DELETE FROM article_saves WHERE article_id IN (SELECT id FROM articles WHERE " + expired + ")").bind(now),
+    db.prepare("DELETE FROM user_topic_articles WHERE article_id IN (SELECT id FROM articles WHERE " + expired + ")").bind(now),
+    db.prepare("DELETE FROM topic_articles WHERE article_id IN (SELECT id FROM articles WHERE " + expired + ")").bind(now),
+    db.prepare("DELETE FROM articles WHERE " + expired).bind(now)
+  ]);
+  return {
+    behaviorEventsDeleted: results[0]?.meta.changes ?? 0,
+    savedItemsDeleted: results[1]?.meta.changes ?? 0,
+    personalFeedLinksDeleted: results[2]?.meta.changes ?? 0,
+    topicArticleLinksDeleted: results[3]?.meta.changes ?? 0,
+    articlesDeleted: results[4]?.meta.changes ?? 0
+  };
+}
