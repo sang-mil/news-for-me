@@ -30,9 +30,6 @@ export async function handleNewsletterRequest(
 
   if (url.pathname === "/api/newsletter/preview" && request.method === "GET") {
     const preview = await buildPreview(env.DB, userId);
-    if (preview.articleCount === 0) {
-      return jsonResponse({ error: "최근 7일 내 발송할 AI 요약 뉴스가 없습니다. 먼저 뉴스 수집을 실행하세요." }, 404, allowedOrigin);
-    }
     return jsonResponse({ data: preview }, 200, allowedOrigin);
   }
 
