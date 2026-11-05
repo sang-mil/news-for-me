@@ -70,7 +70,8 @@ export function createYouTubeVideosSource(apiKey: string): NewsSource {
       for (const video of payload.items ?? []) {
         const videoId = video.id?.videoId?.trim();
         const snippet = video.snippet;
-        const title = snippet?.title?.trim() ?? "";
+        const rawTitle = snippet?.title ?? "";
+        const title = rawTitle.trim();
         if (video.id?.kind !== "youtube#video" || !videoId) {
           rejected.invalidVideo += 1;
           continue;
@@ -79,7 +80,8 @@ export function createYouTubeVideosSource(apiKey: string): NewsSource {
           rejected.missingTitle += 1;
           continue;
         }
-        const description = snippet?.description?.trim() ?? "";
+        const rawDescription = snippet?.description ?? "";
+        const description = rawDescription.trim();
         const channelTitle = snippet?.channelTitle?.trim() ?? "YouTube";
         const searchable = (title + " " + description + " " + channelTitle).toLocaleLowerCase();
         if (!matchesTopicRelevance(input, searchable)) {
@@ -92,11 +94,11 @@ export function createYouTubeVideosSource(apiKey: string): NewsSource {
         }
         const timestamp = snippet?.publishedAt ? Date.parse(snippet.publishedAt) : Number.NaN;
         results.push({
-          title: title.slice(0, 500),
+          title: rawTitle,
           url: "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId),
           sourceName: ("YouTube · " + channelTitle).slice(0, 200),
           publishedAt: Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null,
-          excerpt: description.slice(0, 2000) || null,
+          excerpt: rawDescription || null,
           provider: "youtube-data-api",
           contentType: "video",
           author: channelTitle,
