@@ -59,3 +59,57 @@ export async function cleanupUnScrapedNews(
     articlesDeleted: results[2]?.meta.changes ?? 0
   };
 }
+
+export interface YouTubeApiRetentionResult {
+  summariesDeleted: number;
+  interestProfilesDeleted: number;
+  eventsDeleted: number;
+  articlesDeleted: number;
+}
+
+/**
+ * Delete YouTube Data API records before the 30-calendar-day policy limit.
+ * The one-day safety margin accounts for cron delays and processing time.
+ * User saves cascade with the article so API-derived video metadata is not retained.
+ */
+export async function cleanupExpiredYouTubeApiData(
+  db: D1Database
+): Promise<YouTubeApiRetentionResult> {
+  const expiredVideos = `
+    SELECT id
+    FROM articles
+    WHERE provider = 'youtube-data-api'
+      AND julianday(fetched_at) <= julianday('now', '-29 days')
+  `;
+
+  const results = await db.batch([
+    db.prepare(`
+      DELETE FROM summaries
+      WHERE article_id IN (${expiredVideos})
+    `),
+    db.prepare(`
+      DELETE FROM user_interest_profiles
+      WHERE user_id IN (
+        SELECT DISTINCT user_id
+        FROM article_user_events
+        WHERE article_id IN (${expiredVideos})
+      )
+    `),
+    db.prepare(`
+      DELETE FROM article_user_events
+      WHERE article_id IN (${expiredVideos})
+    `),
+    db.prepare(`
+      DELETE FROM articles
+      WHERE provider = 'youtube-data-api'
+        AND julianday(fetched_at) <= julianday('now', '-29 days')
+    `)
+  ]);
+
+  return {
+    summariesDeleted: results[0]?.meta.changes ?? 0,
+    interestProfilesDeleted: results[1]?.meta.changes ?? 0,
+    eventsDeleted: results[2]?.meta.changes ?? 0,
+    articlesDeleted: results[3]?.meta.changes ?? 0
+  };
+}
