@@ -676,26 +676,26 @@ export default function App() {
                       )}
                     </div>
                     <div className="topic-actions topic-actions-column">
-                      <label className="collection-limit-control">
-                        수집 개수
-                        <select value={collectionLimit} onChange={(event) => setCollectionLimit(Number(event.target.value))} aria-label="수집할 뉴스 개수" disabled={collectingTopicId !== null}>
-                          {[5, 10, 15, 20, 30].map((count) => <option key={count} value={count}>{count}개</option>)}
-                        </select>
-                      </label>
-                      <button type="button" className="icon-button collect-button" onClick={() => void handleCollect(topic)} disabled={collectingTopicId !== null || status !== "online"}>{collectingTopicId === topic.id ? "수집 중…" : "새로고침"}</button>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        onClick={() => void loadArticles(topic.id)}
-                        aria-expanded={expandedTopicId === topic.id}
-                        aria-controls={`articles-${topic.id}`}
-                      >
-                        {expandedTopicId === topic.id ? "기사 접기" : "기사 보기"}
-                      </button>
-                      {topic.isOwner && <>
+                      {topic.isOwner ? <>
+                        <label className="collection-limit-control">
+                          수집 개수
+                          <select value={collectionLimit} onChange={(event) => setCollectionLimit(Number(event.target.value))} aria-label="수집할 뉴스 개수" disabled={collectingTopicId !== null}>
+                            {[5, 10, 15, 20, 30].map((count) => <option key={count} value={count}>{count}개</option>)}
+                          </select>
+                        </label>
+                        <button type="button" className="icon-button collect-button" onClick={() => void handleCollect(topic)} disabled={collectingTopicId !== null || status !== "online"}>{collectingTopicId === topic.id ? "수집 중…" : "새로고침"}</button>
+                        <button
+                          type="button"
+                          className="icon-button"
+                          onClick={() => void loadArticles(topic.id)}
+                          aria-expanded={expandedTopicId === topic.id}
+                          aria-controls={`articles-${topic.id}`}
+                        >
+                          {expandedTopicId === topic.id ? "기사 접기" : "기사 보기"}
+                        </button>
                         <button type="button" className="icon-button" onClick={() => startEdit(topic)}>수정</button>
                         <button type="button" className="icon-button danger" onClick={() => void handleDelete(topic)}>삭제</button>
-                      </>}
+                      </> : <p className="field-help">공개된 주제 정보입니다. 기사 피드와 수집 기능은 작성자 계정에서 관리합니다.</p>}
                     </div>
                   </article>
                 );
