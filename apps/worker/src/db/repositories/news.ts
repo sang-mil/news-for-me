@@ -49,15 +49,16 @@ function toCollectionRun(row: CollectionRunRow): CollectionRun {
 
 export async function getTopicForCollection(
   db: D1Database,
-  topicId: string
+  topicId: string,
+  userId: string
 ): Promise<TopicForCollection | null> {
   return db.prepare(`
     SELECT id, user_id, name, description,
       include_keywords_json, exclude_keywords_json
     FROM topics
-    WHERE id = ? AND is_active = 1
+    WHERE id = ? AND user_id = ? AND is_active = 1
     LIMIT 1
-  `).bind(topicId).first<TopicForCollection>();
+  `).bind(topicId, userId).first<TopicForCollection>();
 }
 
 export async function createCollectionRun(
@@ -93,16 +94,17 @@ export async function listDailyCollectionTargets(
 export async function getCollectionRun(
   db: D1Database,
   topicId: string,
-  runId: string
+  runId: string,
+  userId: string
 ): Promise<CollectionRun | null> {
   const row = await db.prepare(`
     SELECT cr.id, cr.topic_id, cr.status, cr.articles_found,
       cr.error_message, cr.started_at, cr.finished_at, cr.created_at
     FROM collection_runs cr
     INNER JOIN topics t ON t.id = cr.topic_id
-    WHERE cr.id = ? AND cr.topic_id = ?
+    WHERE cr.id = ? AND cr.topic_id = ? AND t.user_id = ?
     LIMIT 1
-  `).bind(runId, topicId).first<CollectionRunRow>();
+  `).bind(runId, topicId, userId).first<CollectionRunRow>();
   return row ? toCollectionRun(row) : null;
 }
 
@@ -196,16 +198,34 @@ export async function storeCollectedArticles(
       INSERT OR IGNORE INTO articles (
         id, canonical_url, url_hash, title, source_name,
         published_at, content_excerpt, language, metadata_json, provider,
-        content_type, author, body_content, image_url, engagement_json, external_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        content_type, author, body_content, image_url, engagement_json, external_id,
+        provider_data_refreshed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        CASE WHEN ? = 'youtube-data-api' THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now') ELSE NULL END)
     `).bind(
       articleId, normalizedUrl, urlHash, item.title, item.sourceName,
       item.publishedAt, item.excerpt, item.language ?? "ko",
       JSON.stringify({ provider: item.provider, ...(item.metadata ?? {}) }),
       item.provider, item.contentType ?? "article", item.author ?? null,
       item.bodyContent ?? null, item.imageUrl ?? null,
-      JSON.stringify(item.engagement ?? {}), item.externalId ?? null
+      JSON.stringify(item.engagement ?? {}), item.externalId ?? null,
+      item.provider
     ));
+
+    if (item.provider === "youtube-data-api") {
+      statements.push(db.prepare(`
+        UPDATE articles
+        SET title = ?, source_name = ?, published_at = ?, content_excerpt = ?,
+          author = ?, image_url = ?, language = ?, metadata_json = ?,
+          external_id = ?, provider_data_refreshed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        WHERE canonical_url = ? AND provider = 'youtube-data-api'
+      `).bind(
+        item.title, item.sourceName, item.publishedAt, item.excerpt,
+        item.author ?? null, item.imageUrl ?? null, item.language ?? "ko",
+        JSON.stringify({ provider: item.provider, ...(item.metadata ?? {}) }),
+        item.externalId ?? null, normalizedUrl
+      ));
+    }
 
     statements.push(db.prepare(`
       INSERT OR IGNORE INTO topic_articles (topic_id, article_id, match_reason)

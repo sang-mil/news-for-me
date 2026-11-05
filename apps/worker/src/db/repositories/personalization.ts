@@ -49,9 +49,9 @@ export async function recordArticleEvent(
   eventType: ArticleEventType
 ): Promise<void> {
   const article = await db.prepare(
-    "SELECT title, source_name FROM articles WHERE id = ? LIMIT 1"
-  ).bind(articleId).first<{ title: string; source_name: string | null }>();
-  if (!article) return;
+    "SELECT title, source_name, provider FROM articles WHERE id = ? LIMIT 1"
+  ).bind(articleId).first<{ title: string; source_name: string | null; provider: string }>();
+  if (!article || article.provider === "youtube-data-api") return;
 
   let topicName: string | null = null;
   if (topicId) {
@@ -85,7 +85,7 @@ export async function getInterestProfile(
       LIMIT 1
     `).bind(userId).first<ProfileRow>(),
     db.prepare(
-      "SELECT COUNT(*) AS count FROM article_user_events WHERE user_id = ?"
+      "SELECT COUNT(*) AS count FROM article_user_events WHERE user_id = ? AND (article_id IS NULL OR article_id NOT IN (SELECT id FROM articles WHERE provider = 'youtube-data-api'))"
     ).bind(userId).first<CountRow>()
   ]);
 
@@ -110,6 +110,9 @@ export async function getUserBehaviorSignals(
         COUNT(*) AS event_count, MAX(created_at) AS latest_at
       FROM article_user_events
       WHERE user_id = ?
+        AND (article_id IS NULL OR article_id NOT IN (
+          SELECT id FROM articles WHERE provider = 'youtube-data-api'
+        ))
       GROUP BY event_type, article_title, source_name, topic_name
       ORDER BY latest_at DESC
       LIMIT 80
@@ -131,6 +134,7 @@ export async function getUserBehaviorSignals(
       LEFT JOIN user_tags tags
         ON tags.user_id = ast.user_id AND tags.id = ast.tag_id
       WHERE s.user_id = ?
+        AND a.provider <> 'youtube-data-api'
       GROUP BY a.id, a.title, a.source_name, s.note, s.saved_at
       ORDER BY s.saved_at DESC
       LIMIT 30

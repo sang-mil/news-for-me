@@ -35,7 +35,7 @@ export async function handleCollectionRequest(
     return jsonResponse({ error: "Invalid topic ID." }, 400, allowedOrigin);
   }
 
-  const topic = await getTopicForCollection(db, topicId);
+  const topic = await getTopicForCollection(db, topicId, userId);
   if (!topic) {
     return jsonResponse({ error: "Topic not found or inactive." }, 404, allowedOrigin);
   }
@@ -94,7 +94,7 @@ export async function handleCollectionRequest(
     } catch {
       return jsonResponse({ error: "Invalid collection run ID." }, 400, allowedOrigin);
     }
-    const run = await getCollectionRun(db, topicId, runId);
+    const run = await getCollectionRun(db, topicId, runId, userId);
     return run
       ? jsonResponse({ data: run }, 200, allowedOrigin)
       : jsonResponse({ error: "Collection run not found." }, 404, allowedOrigin);

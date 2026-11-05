@@ -82,6 +82,7 @@ export default function Newsletter({ userEmail }: NewsletterProps) {
 
   useEffect(() => {
     void refreshSchedules();
+    void handlePreview();
   }, []);
 
   async function refreshSchedules() {
@@ -299,7 +300,7 @@ export default function Newsletter({ userEmail }: NewsletterProps) {
         )}
       </div>
 
-      {preview ? (
+      {preview && preview.articleCount > 0 ? (
         <div className="newsletter-preview">
           <div className="newsletter-preview-meta">
             <div>
@@ -319,6 +320,14 @@ export default function Newsletter({ userEmail }: NewsletterProps) {
             sandbox=""
             referrerPolicy="no-referrer"
           />
+          <details className="newsletter-text-fallback">
+            <summary>HTML 미리보기가 보이지 않으면 텍스트로 확인</summary>
+            <pre>{preview.text}</pre>
+          </details>
+        </div>
+      ) : preview ? (
+        <div className="newsletter-empty">
+          최근 {preview.periodDays}일 내 발송할 AI 요약 뉴스가 없습니다. 먼저 관심 주제에서 뉴스 수집을 실행하고, AI 요약이 완료된 뒤 미리보기를 새로고침하세요.
         </div>
       ) : (
         <div className="newsletter-empty">

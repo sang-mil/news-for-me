@@ -6,6 +6,7 @@ import type { StoredCollectedArticle } from "../news/types";
 import type { AIEnvironment } from "./types";
 import { hasAIProviderConfigured } from "./types";
 import { routeSummaryRequest } from "./policies/fallback";
+import { selectSummarizableArticles } from "./summarization-filter.ts";
 
 const PROMPT_VERSION = "v1";
 const BATCH_SIZE = 8;
@@ -22,9 +23,7 @@ export async function summarizeCollectedArticles(
     return { summarized: 0, skipped: storedArticles.length };
   }
 
-  const unique = new Map<string, StoredCollectedArticle>();
-  for (const article of storedArticles) unique.set(article.articleId, article);
-  const articleList = [...unique.values()];
+  const articleList = selectSummarizableArticles(storedArticles);
 
   const pendingIds = await findUnsummarizedArticleIds(
     db, topicId, articleList.map((x) => x.articleId), PROMPT_VERSION
