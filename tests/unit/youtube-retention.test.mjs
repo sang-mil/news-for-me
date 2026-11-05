@@ -53,7 +53,7 @@ test("YouTube retention cleanup removes dependent data before article rows", asy
 });
 
 
-import { selectSummarizableArticles } from "../../apps/worker/src/services/ai/summarizer.ts";
+import { selectSummarizableArticles } from "../../apps/worker/src/services/ai/summarization-filter.ts";
 
 test("YouTube API results are excluded from AI summarization", () => {
   const video = {
