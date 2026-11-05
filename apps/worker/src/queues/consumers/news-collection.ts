@@ -6,7 +6,6 @@ import { collectFromSources } from "../../services/news/collection-engine";
 import { googleNewsRssSource } from "../../services/news/sources/google-news-rss";
 import { searchBingNewsRss } from "../../services/news/sources/bing-news-rss";
 import { gdeltNewsSource } from "../../services/news/sources/gdelt-news";
-import { createNaverNewsSource } from "../../services/news/sources/naver-news";
 import { searchGitHubRepositories } from "../../services/news/sources/github-search";
 import { searchV2exTopics } from "../../services/news/sources/v2ex";
 import { createYouTubeVideosSource } from "../../services/news/sources/youtube";
@@ -20,7 +19,7 @@ import type { AIEnvironment } from "../../services/ai/types";
 import type { CollectionJobMessage, NewsSource } from "../../services/news/types";
 import { getUserIntegration, type IntegrationProvider } from "../../services/integrations";
 
-interface CollectionConsumerEnv extends AIEnvironment { DB: D1Database; INTEGRATION_ENCRYPTION_KEY?: string; YOUTUBE_API_KEY?: string; X_BEARER_TOKEN?: string; THREADS_ACCESS_TOKEN?: string; NAVER_CLIENT_ID?: string; NAVER_CLIENT_SECRET?: string; }
+interface CollectionConsumerEnv extends AIEnvironment { DB: D1Database; INTEGRATION_ENCRYPTION_KEY?: string; YOUTUBE_API_KEY?: string; X_BEARER_TOKEN?: string; THREADS_ACCESS_TOKEN?: string; }
 
 function parseKeywords(value: string): string[] {
   try {
@@ -123,15 +122,6 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
   ];
   const skippedSources: string[] = [];
   const softwareTopic = isSoftwareOrTechTopic(searchInput);
-  const naverClientId = env.NAVER_CLIENT_ID?.trim();
-  const naverClientSecret = env.NAVER_CLIENT_SECRET?.trim();
-
-  if (naverClientId && naverClientSecret) {
-    sources.push(createNaverNewsSource(naverClientId, naverClientSecret));
-  } else {
-    skippedSources.push("naver-news-api (missing NAVER_CLIENT_ID/NAVER_CLIENT_SECRET)");
-  }
-
   if (softwareTopic) {
     sources.push(
       { id: "github-search", contentType: "repository", search: (input) => searchGitHubRepositories(input) },
