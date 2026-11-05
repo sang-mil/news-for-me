@@ -1,4 +1,4 @@
-import type { CollectedNewsItem, NewsSearchInput } from "../types";
+import type { CollectedNewsItem, NewsSearchInput, NewsSourceSearchResult } from "../types";
 
 interface V2exTopic {
   id?: number;
@@ -30,7 +30,7 @@ function stripHtml(value: string): string {
 export async function searchV2exTopics(
   input: NewsSearchInput,
   maxResults = input.maxResults ?? 10
-): Promise<CollectedNewsItem[]> {
+): Promise<NewsSourceSearchResult> {
   const endpoints = [
     "https://www.v2ex.com/api/topics/hot.json",
     "https://www.v2ex.com/api/topics/latest.json"
@@ -53,16 +53,32 @@ export async function searchV2exTopics(
   const excluded = input.excludeKeywords.map((term) => term.toLocaleLowerCase()).filter(Boolean);
   const seen = new Set<number>();
   const items: CollectedNewsItem[] = [];
+  const rejected: Record<string, number> = {
+    invalidTopic: 0, topicMismatch: 0, excludedKeyword: 0, duplicateTopic: 0
+  };
 
   for (const topic of topics) {
-    if (typeof topic.id !== "number" || seen.has(topic.id)) continue;
+    if (typeof topic.id !== "number") {
+      rejected.invalidTopic += 1;
+      continue;
+    }
+    if (seen.has(topic.id)) {
+      rejected.duplicateTopic += 1;
+      continue;
+    }
     seen.add(topic.id);
     const title = topic.title?.trim() ?? "";
     const content = stripHtml(topic.content_rendered ?? topic.content ?? "");
     const node = topic.node?.title ?? topic.node?.name ?? "V2EX";
     const searchable = `${title} ${content} ${node}`.toLocaleLowerCase();
-    if (!terms.some((term) => searchable.includes(term))) continue;
-    if (excluded.some((term) => searchable.includes(term))) continue;
+    if (!terms.some((term) => searchable.includes(term))) {
+      rejected.topicMismatch += 1;
+      continue;
+    }
+    if (excluded.some((term) => searchable.includes(term))) {
+      rejected.excludedKeyword += 1;
+      continue;
+    }
 
     const url = topic.url?.startsWith("https://www.v2ex.com/t/")
       ? topic.url
@@ -85,8 +101,20 @@ export async function searchV2exTopics(
     if (items.length >= maxResults) break;
   }
 
+  if (responses.some((result) => result.status === "rejected")) {
+    rejected.endpointFailure = responses.filter((result) => result.status === "rejected").length;
+  }
+  const rejectedCounts = Object.fromEntries(Object.entries(rejected).filter(([, count]) => count > 0));
   console.info("[NewsForMe][RSS] V2EX search completed", {
-    candidates: topics.length, matched: items.length, queryTerms: terms
+    candidates: topics.length, matched: items.length, rejected: rejectedCounts, queryTerms: terms
   });
-  return items;
+  return {
+    items,
+    diagnostics: {
+      fetchedCount: topics.length,
+      acceptedCount: items.length,
+      rejected: rejectedCounts,
+      attempts: endpoints.map((endpoint, index) => `${endpoint.includes("hot") ? "hot" : "latest"}=${responses[index].status}`)
+    }
+  };
 }
