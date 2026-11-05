@@ -27,7 +27,7 @@ function buildQuery(terms: string[], excluded: string[]): string {
     ? `(${terms.map((term) => `"${term}"`).join(" OR ")})`
     : `"${terms[0] ?? ""}"`;
   const negatives = excluded.slice(0, 5).map((term) => `-"${term}"`);
-  return [positive, "sourcelang:Korean", ...negatives].filter(Boolean).join(" ");
+  return [positive, ...negatives].filter(Boolean).join(" ");
 }
 
 export function buildGdeltQueries(input: NewsSearchInput): string[] {
@@ -65,6 +65,7 @@ interface GdeltAttempt {
   rawCount: number;
   acceptedCount: number;
   rejected: Record<string, number>;
+  titleNotMatched: number;
 }
 
 async function fetchGdeltQuery(
@@ -112,9 +113,9 @@ async function fetchGdeltQuery(
     missingTitle: 0,
     missingUrl: 0,
     invalidUrl: 0,
-    topicMismatch: 0,
     excludedKeyword: 0
   };
+  let titleNotMatched = 0;
   const excluded = input.excludeKeywords.map((term) => term.toLocaleLowerCase()).filter(Boolean);
   const items: CollectedNewsItem[] = [];
 
@@ -134,10 +135,9 @@ async function fetchGdeltQuery(
       continue;
     }
     const searchable = `${title} ${article.domain ?? ""}`.toLocaleLowerCase();
-    if (!matchesTopicRelevance(input, searchable)) {
-      rejected.topicMismatch += 1;
-      continue;
-    }
+    // GDELT searches article text, not just the headline. Keep a valid provider match
+    // even when the keyword appears only in the article body.
+    if (!matchesTopicRelevance(input, searchable)) titleNotMatched += 1;
     if (excluded.some((keyword) => searchable.includes(keyword))) {
       rejected.excludedKeyword += 1;
       continue;
@@ -166,7 +166,8 @@ async function fetchGdeltQuery(
       queryVariant,
       rawCount: payload.articles.length,
       acceptedCount: items.length,
-      rejected: Object.fromEntries(Object.entries(rejected).filter(([, count]) => count > 0))
+      rejected: Object.fromEntries(Object.entries(rejected).filter(([, count]) => count > 0)),
+      titleNotMatched
     }
   };
 }
@@ -206,6 +207,7 @@ export async function searchGdeltNews(
   }
   const duplicateCount = attempts.reduce((sum, attempt) => sum + attempt.acceptedCount, 0) - items.length;
   if (duplicateCount > 0) rejected.duplicateAcrossQueries = duplicateCount;
+  const titleNotMatchedCount = attempts.reduce((sum, attempt) => sum + (attempt as GdeltAttempt & { titleNotMatched?: number }).titleNotMatched!, 0);
 
   return {
     items,
@@ -213,6 +215,7 @@ export async function searchGdeltNews(
       fetchedCount: attempts.reduce((sum, attempt) => sum + attempt.rawCount, 0),
       acceptedCount: items.length,
       rejected,
+      observations: titleNotMatchedCount > 0 ? { titleNotMatched: titleNotMatchedCount } : {},
       attempts: attempts.map((attempt) => `${attempt.queryVariant}: raw=${attempt.rawCount}, accepted=${attempt.acceptedCount}`)
     }
   };
