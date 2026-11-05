@@ -167,14 +167,14 @@ async function processCollectionJob(job: CollectionJobMessage, env: CollectionCo
     .map((failure) => failure.sourceId + ": " + failure.message)
     .join(" | ");
   const diagnosticSummary = Object.entries(collection.sourceDiagnostics)
-    .filter((entry): entry is [string, NonNullable<typeof entry[1]>] => entry[1] !== null)
-    .map(([id, diagnostic]) => {
+    .flatMap(([id, diagnostic]) => {
+      if (!diagnostic) return [];
       const rejected = Object.entries(diagnostic.rejected)
         .map(([reason, count]) => reason + ":" + count)
         .join(",");
-      return id + "[fetched:" + diagnostic.fetchedCount
+      return [id + "[fetched:" + diagnostic.fetchedCount
         + ",accepted:" + diagnostic.acceptedCount
-        + (rejected ? ",rejected:" + rejected : "") + "]";
+        + (rejected ? ",rejected:" + rejected : "") + "]"];
     })
     .join(" ");
   const shortfall = Math.max(0, maxArticles - collection.items.length);
