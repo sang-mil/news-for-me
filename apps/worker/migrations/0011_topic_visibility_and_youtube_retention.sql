@@ -19,3 +19,8 @@ CREATE INDEX idx_articles_provider_data_retention
 -- Remove previously generated AI summaries based on YouTube API data.
 DELETE FROM summaries
 WHERE article_id IN (SELECT id FROM articles WHERE provider = 'youtube-data-api');
+
+-- Remove historical events and derived profiles that may include YouTube API data.
+DELETE FROM article_user_events
+WHERE article_id IN (SELECT id FROM articles WHERE provider = 'youtube-data-api');
+DELETE FROM user_interest_profiles;
