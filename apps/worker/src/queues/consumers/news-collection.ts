@@ -55,7 +55,7 @@ function useSavedSecret(
 
 async function processCollectionJob(job: CollectionJobMessage, env: CollectionConsumerEnv): Promise<void> {
   await markCollectionStarted(env.DB, job.runId);
-  const topic = await getTopicForCollection(env.DB, job.topicId);
+  const topic = await getTopicForCollection(env.DB, job.topicId, job.userId);
   if (!topic) throw new Error("Topic no longer exists or is inactive.");
 
   const maxArticles = Math.min(30, Math.max(5, Math.floor(job.maxArticles ?? 10)));
