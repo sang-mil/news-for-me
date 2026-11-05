@@ -39,7 +39,7 @@ export function createYouTubeVideosSource(apiKey: string): NewsSource {
   return {
     id: "youtube-data-api",
     contentType: "video",
-    async search(input: NewsSearchInput): Promise<CollectedNewsItem[]> {
+    async search(input: NewsSearchInput): Promise<NewsSourceSearchResult> {
       const query = buildYouTubeSearchQuery(input);
       if (!query) return [];
       const url = new URL("https://www.googleapis.com/youtube/v3/search");
